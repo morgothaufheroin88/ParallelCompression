@@ -131,8 +131,8 @@ std::vector<std::byte> deflate::Huffman::encodeWithDynamicCodes(const std::vecto
     auto treeNodes = buildTree(frequencies);
     calculateCodesLengths(treeNodes, treeNodes.size() - 1);
 
-    std::ranges::sort(treeNodes,NodeSort());
-    std::vector<std::uint8_t> codeLengths = {3, 3, 3, 3,3, 2, 4, 4  };
+    std::ranges::sort(treeNodes, NodeSort());
+    std::vector<std::uint8_t> codeLengths = {3, 3, 3, 3, 3, 2, 4, 4};
     auto codeTable = createCodeTable(codeLengths);
 
 
@@ -147,13 +147,13 @@ std::unordered_map<std::uint16_t, std::uint16_t> deflate::Huffman::createCodeTab
     std::array<std::uint16_t, MAX_BITS + 1> codeLengthsCount = {0};
     std::array<std::uint16_t, MAX_BITS + 1> nextCode = {0};
 
-    for(const auto& length : codeLengths)
+    for (const auto &length: codeLengths)
     {
         codeLengthsCount[length]++;
     }
 
     std::uint16_t code{0};
-    for(std::uint8_t bit = 1; bit <= MAX_BITS; bit++)
+    for (std::uint8_t bit = 1; bit <= MAX_BITS; bit++)
     {
         code = (code + codeLengthsCount[bit - 1]) << 1;
         nextCode[bit] = code;
@@ -193,28 +193,28 @@ std::vector<std::byte> deflate::Huffman::encodeWithFixedCodes(const std::vector<
 
     //write header
     std::byte byteToWrite{0};
-    if(isLastBlock)
+    if (isLastBlock)
     {
         byteToWrite |= std::byte(0b1);
     }
 
     byteToWrite |= (std::byte{0b01} << 2);
 
-    for(int i = 0; i < 8;i++)
+    for (int i = 0; i < 8; i++)
     {
-        std::uint8_t mask = (1 << i + 1) -1 ;
+        std::uint8_t mask = (1 << i + 1) - 1;
         std::cout << std::bitset<8>(static_cast<char>(mask)).to_string() << "\n";
     }
 
 
-    for(const auto& lz77Match : lz77CompressedData)
+    for (const auto &lz77Match: lz77CompressedData)
     {
-        if(lz77Match.length > 1)
+        if (lz77Match.length > 1)
         {
-            const auto& lengthCode = FIXED_LENGTHS_CODES[lz77Match.length];
-            const auto& distanceCode = FIXED_DISTANCES_CODES[lz77Match.distance];
-            std::cout <<"Code : " << std::bitset<8>(static_cast<char>(distanceCode.code)).to_string() << " ,distance:  " << lz77Match.distance <<"=" << distanceCode.distance << " extra bits: " << std::bitset<8>(distanceCode.extraBits).to_string() << "\n";
-            std::cout <<"Code : " << std::bitset<8>(static_cast<char>(lengthCode.code)).to_string() << " ,length:  " << lz77Match.length <<"=" << static_cast<int>(lengthCode.length) << " extra bits: " << std::bitset<8>(lengthCode.extraBits).to_string() << " extra bits count : "<< static_cast<int>(lengthCode.extraBitsCount)<<"\n";
+            const auto &lengthCode = FIXED_LENGTHS_CODES[lz77Match.length];
+            const auto &distanceCode = FIXED_DISTANCES_CODES[lz77Match.distance];
+            std::cout << "Code : " << std::bitset<8>(static_cast<char>(distanceCode.code)).to_string() << " ,distance:  " << lz77Match.distance << "=" << distanceCode.distance << " extra bits: " << std::bitset<8>(distanceCode.extraBits).to_string() << "\n";
+            std::cout << "Code : " << std::bitset<8>(static_cast<char>(lengthCode.code)).to_string() << " ,length:  " << lz77Match.length << "=" << static_cast<int>(lengthCode.length) << " extra bits: " << std::bitset<8>(lengthCode.extraBits).to_string() << " extra bits count : " << static_cast<int>(lengthCode.extraBitsCount) << "\n";
         }
     }
 

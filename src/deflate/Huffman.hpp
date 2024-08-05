@@ -47,21 +47,21 @@ namespace deflate
         struct LiteralCode
         {
             std::uint16_t code;
-            std::uint8_t  codeLength;
+            std::uint8_t codeLength;
         };
 
         struct LengthCode
         {
             std::uint16_t length;
             std::uint16_t code;
-            std::uint8_t  codeLength;
+            std::uint8_t codeLength;
             std::uint8_t extraBitsCount;
             std::uint16_t extraBits;
         };
         struct DistanceCode
         {
             std::uint8_t code;
-            std::uint16_t  distance;
+            std::uint16_t distance;
             std::uint8_t extraBitsCount;
             std::uint16_t extraBits;
         };
@@ -71,12 +71,12 @@ namespace deflate
         static constexpr auto FIXED_LITERALS_CODES{
                 []() constexpr
                 {
-                    std::array<LiteralCode,256> result{};
+                    std::array<LiteralCode, 256> result{};
                     std::uint16_t start = 0b00110000;
                     std::uint8_t countOfBits = 8;
                     for (auto i = 0; i < 256; ++i)
                     {
-                        if(i == 144)
+                        if (i == 144)
                         {
                             countOfBits = 9;
                             start = 0b110010000;
@@ -103,7 +103,7 @@ namespace deflate
                         if ((i > 2) && (i % 2) == 0)
                         {
                             bits++;
-                            for (std::uint8_t j = 0; j <bits; j++)
+                            for (std::uint8_t j = 0; j < bits; j++)
                             {
                                 mask = (1 << j + 1) - 1;
                             }
@@ -125,10 +125,10 @@ namespace deflate
                     return result;
                 }()};
 
-        static constexpr auto FIXED_LENGTHS_CODES {
+        static constexpr auto FIXED_LENGTHS_CODES{
                 []() constexpr
                 {
-                    std::array<LengthCode,259> result{};
+                    std::array<LengthCode, 259> result{};
                     std::uint16_t start = 0b0000000;
                     std::uint8_t countOfBits = 7;
                     std::uint8_t extraBitsCount{0};
@@ -136,21 +136,20 @@ namespace deflate
                     std::uint8_t mask{0};
                     for (auto i = 256; i < 285; ++i)
                     {
-                        if(i == 280)
+                        if (i == 280)
                         {
                             countOfBits = 8;
                             start = 0b11000000;
                         }
-                        if(i < 265)
+                        if (i < 265)
                         {
                             length++;
                         }
                         else
                         {
-                            if((i % 4) == 1)
+                            if ((i % 4) == 1)
                             {
                                 extraBitsCount++;
-
                             }
                         }
 
@@ -166,7 +165,7 @@ namespace deflate
                             result[length].codeLength = countOfBits;
                             result[length].extraBits = j;
                             result[length].extraBitsCount = extraBitsCount;
-                            if(i > 264)
+                            if (i > 264)
                             {
                                 length++;
                             }

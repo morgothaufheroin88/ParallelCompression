@@ -71,7 +71,7 @@ std::vector<std::byte> deflate::LZ77::decompress(const std::vector<Match> &compr
     std::vector<std::byte> decompressedData;
     decompressedData.reserve(compressedData.size() * 2);
 
-    for (const Match& match : compressedData)
+    for (const Match &match: compressedData)
     {
         if (match.length == 1)
         {

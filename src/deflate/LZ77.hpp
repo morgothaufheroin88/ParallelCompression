@@ -11,9 +11,7 @@ namespace deflate
 {
     class LZ77
     {
-    private:
-        static constexpr std::uint16_t WINDOW_SIZE = 32 * 1024;
-
+    public:
         struct Match
         {
             std::byte literal;
@@ -21,10 +19,12 @@ namespace deflate
             std::uint16_t length;
         };
 
+    private:
+        static constexpr std::uint16_t WINDOW_SIZE = 32 * 1024;
         static Match findBestMatch(const std::vector<std::byte> &data, std::uint16_t position);
 
     public:
         static std::vector<Match> compress(const std::vector<std::byte> &dataToCompress);
-        static std::vector<std::byte> decompress(const std::vector<Match>& compressedData);
+        static std::vector<std::byte> decompress(const std::vector<Match> &compressedData);
     };
 }// namespace deflate
