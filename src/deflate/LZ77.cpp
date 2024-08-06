@@ -24,7 +24,7 @@ deflate::LZ77::Match deflate::LZ77::findBestMatch(const std::vector<std::byte> &
             mask >>= 1;
         }
 
-        if (matchLength > bestMatch.length)
+        if (matchLength > bestMatch.length && matchLength > 1)
         {
             bestMatch.length = static_cast<std::uint16_t>(matchLength);
             bestMatch.distance = i;
