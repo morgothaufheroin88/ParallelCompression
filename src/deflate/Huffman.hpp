@@ -33,7 +33,7 @@ namespace deflate
 
         struct NodeSort
         {
-            bool operator()(const Node &left, const Node &right)
+            bool operator()(const Node &left, const Node &right) const
             {
                 if (left.codeLength == right.codeLength)
                 {
@@ -66,6 +66,17 @@ namespace deflate
             std::uint16_t extraBits;
         };
 
+        static std::uint16_t reverseBits(std::uint16_t n, std::uint8_t bitCount)
+        {
+            std::uint16_t result = 0;
+            for (std::uint8_t i = 0; i < bitCount; ++i)
+            {
+                result |= ((n >> i) & 1) << (bitCount - 1 - i);
+            }
+            return result;
+        }
+
+
         using TreeNodes = std::vector<Node>;
         static constexpr std::uint16_t LITERALS_AND_LENGTHS_ALPHABET_SIZE = 286;
         static constexpr auto FIXED_LITERALS_CODES{
@@ -81,8 +92,12 @@ namespace deflate
                             countOfBits = 9;
                             start = 0b110010000;
                         }
-
-                        result[i].code = start;
+                        std::uint16_t reversedCode = 0;
+                        for (std::uint8_t j = 0; j < countOfBits; ++j)
+                        {
+                            reversedCode |= ((start >> j) & 1) << (countOfBits - 1 - j);
+                        }
+                        result[i].code = reversedCode;
                         result[i].codeLength = countOfBits;
                         start++;
                     }
@@ -105,15 +120,22 @@ namespace deflate
                             bits++;
                             for (std::uint8_t j = 0; j < bits; j++)
                             {
-                                mask = (1 << j + 1) - 1;
+                                mask = static_cast<uint16_t>((1 << (j + 1)) - 1);
                             }
+                        }
+
+                        std::byte reversedCode{0};
+                        for (std::uint8_t j = 0; j < 5; ++j)
+                        {
+                            reversedCode |= ((std::byte(i) >> j) & std::byte(1)) << (4 - j);
                         }
 
                         for (std::uint16_t j = 0; j <= mask; j++)
                         {
                             DistanceCode code{};
 
-                            code.code = i;
+
+                            code.code = std::to_integer<std::uint8_t>(reversedCode);
                             code.distance = lastDistance;
                             code.extraBitsCount = bits;
                             code.extraBits = j;
@@ -132,9 +154,9 @@ namespace deflate
                     std::uint16_t start = 0b0000000;
                     std::uint8_t countOfBits = 7;
                     std::uint8_t extraBitsCount{0};
-                    std::uint16_t length{2};
+                    std::uint16_t length{1};
                     std::uint8_t mask{0};
-                    for (auto i = 256; i < 285; ++i)
+                    for (auto i = 256; i < 285; i++)
                     {
                         if (i == 280)
                         {
@@ -155,17 +177,24 @@ namespace deflate
 
                         for (std::uint8_t j = 0; j < extraBitsCount; j++)
                         {
-                            mask = (1 << j + 1) - 1;
+                            mask = static_cast<std::uint8_t>((1 << (j + 1)) - 1);
+                        }
+
+                        std::uint16_t reversedCode = 0;
+                        for (std::uint8_t j = 0; j < countOfBits; ++j)
+                        {
+                            reversedCode |= ((start >> j) & 1) << (countOfBits - 1 - j);
                         }
 
                         for (std::uint16_t j = 0; j <= mask; j++)
                         {
+
                             result[length].length = length;
-                            result[length].code = start;
+                            result[length].code = reversedCode;
                             result[length].codeLength = countOfBits;
                             result[length].extraBits = j;
                             result[length].extraBitsCount = extraBitsCount;
-                            if (i > 264)
+                            if (i > 265)
                             {
                                 length++;
                             }
@@ -186,6 +215,7 @@ namespace deflate
         static void calculateCodesLengths(TreeNodes &treeNodes, std::uint32_t rootIndex);
         static std::unordered_map<std::uint16_t, std::uint16_t> createCodeTable(const std::vector<std::uint8_t> &codeLengths);
         static std::unordered_map<std::uint16_t, std::uint16_t> createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths);
+        static void addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, std::uint8_t &bitPosition, std::byte &currentByte);
 
     public:
         static std::vector<std::byte> encodeWithDynamicCodes(const std::vector<LZ77::Match> &lz77CompressedData, bool isLastBlock);

@@ -191,20 +191,21 @@ std::vector<std::byte> deflate::Huffman::encodeWithFixedCodes(const std::vector<
     std::vector<std::byte> compressedData;
     compressedData.reserve(lz77CompressedData.size());
 
+    std::byte currentByte{0};
+    std::uint8_t bitPosition = 0;
+
     //write header
-    std::byte byteToWrite{0};
     if (isLastBlock)
     {
-        byteToWrite |= std::byte(0b1);
+        addBitsToBuffer(compressedData, 1, 1, bitPosition, currentByte);
     }
-
-    byteToWrite |= (std::byte{0b01} << 2);
-
-    for (int i = 0; i < 8; i++)
+    else
     {
-        std::uint8_t mask = (1 << i + 1) - 1;
-        std::cout << std::bitset<8>(static_cast<char>(mask)).to_string() << "\n";
+        addBitsToBuffer(compressedData, 0, 1, bitPosition, currentByte);
+
     }
+
+    addBitsToBuffer(compressedData, 0b01, 2, bitPosition, currentByte);
 
 
     for (const auto &lz77Match: lz77CompressedData)
@@ -213,10 +214,51 @@ std::vector<std::byte> deflate::Huffman::encodeWithFixedCodes(const std::vector<
         {
             const auto &lengthCode = FIXED_LENGTHS_CODES[lz77Match.length];
             const auto &distanceCode = FIXED_DISTANCES_CODES[lz77Match.distance];
-            std::cout << "Code : " << std::bitset<8>(static_cast<char>(distanceCode.code)).to_string() << " ,distance:  " << lz77Match.distance << "=" << distanceCode.distance << " extra bits: " << std::bitset<8>(distanceCode.extraBits).to_string() << "\n";
-            std::cout << "Code : " << std::bitset<8>(static_cast<char>(lengthCode.code)).to_string() << " ,length:  " << lz77Match.length << "=" << static_cast<int>(lengthCode.length) << " extra bits: " << std::bitset<8>(lengthCode.extraBits).to_string() << " extra bits count : " << static_cast<int>(lengthCode.extraBitsCount) << "\n";
+
+            //encode lz77 lengths
+            addBitsToBuffer(compressedData, lengthCode.code, lengthCode.codeLength,bitPosition,currentByte);
+            addBitsToBuffer(compressedData,lengthCode.extraBits, lengthCode.extraBitsCount,bitPosition,currentByte);
+
+            //encode lz77 distance
+            addBitsToBuffer(compressedData, distanceCode.code, 5,bitPosition,currentByte);
+            addBitsToBuffer(compressedData,distanceCode.extraBits, distanceCode.extraBitsCount,bitPosition,currentByte);
+        }
+        else
+        {
+            const auto &literalCode = FIXED_LITERALS_CODES[static_cast<std::uint8_t>(lz77Match.literal)];
+
+            //encode lz77 literal
+            addBitsToBuffer(compressedData, literalCode.code,literalCode.codeLength,bitPosition,currentByte);
         }
     }
 
+    //write end of block
+    addBitsToBuffer(compressedData,0,7,bitPosition,currentByte);
+    if (bitPosition > 0)
+    {
+        compressedData.push_back(currentByte);
+    }
+
     return compressedData;
+}
+
+void deflate::Huffman::addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, uint8_t &bitPosition, std::byte &currentByte)
+{
+    while (bitCount > 0)
+    {
+        auto bitsToWrite = std::min(bitCount, static_cast<std::uint8_t>(8 - bitPosition));
+        auto bits = std::byte((value & ((1 << bitsToWrite) - 1)) << bitPosition);
+        currentByte |= bits;
+
+        bitPosition += bitsToWrite;
+        bitCount -= bitsToWrite;
+        value >>= bitsToWrite;
+
+        if(bitPosition == 8)
+        {
+            buffer.push_back(currentByte);
+            currentByte = std::byte{0};
+            bitPosition = 0;
+        }
+    }
 }
