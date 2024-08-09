@@ -48,6 +48,7 @@ namespace deflate
         {
             std::uint16_t code;
             std::uint8_t codeLength;
+            std::byte literal;
         };
 
         struct LengthCode
@@ -92,13 +93,17 @@ namespace deflate
                             countOfBits = 9;
                             start = 0b110010000;
                         }
+
                         std::uint16_t reversedCode = 0;
                         for (std::uint8_t j = 0; j < countOfBits; ++j)
                         {
                             reversedCode |= ((start >> j) & 1) << (countOfBits - 1 - j);
                         }
+
                         result[i].code = reversedCode;
                         result[i].codeLength = countOfBits;
+                        result[i].literal = static_cast<std::byte>(i);
+
                         start++;
                     }
                     return result;
@@ -133,7 +138,6 @@ namespace deflate
                         for (std::uint16_t j = 0; j <= mask; j++)
                         {
                             DistanceCode code{};
-
 
                             code.code = std::to_integer<std::uint8_t>(reversedCode);
                             code.distance = lastDistance;
@@ -220,5 +224,6 @@ namespace deflate
     public:
         static std::vector<std::byte> encodeWithDynamicCodes(const std::vector<LZ77::Match> &lz77CompressedData, bool isLastBlock);
         static std::vector<std::byte> encodeWithFixedCodes(const std::vector<LZ77::Match> &lz77CompressedData, bool isLastBlock);
+        static std::vector<LZ77::Match> decodeWithFixedCodes(const std::vector<std::byte> &bitsCount);
     };
 }// namespace deflate
