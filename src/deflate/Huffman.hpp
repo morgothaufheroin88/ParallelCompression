@@ -5,6 +5,7 @@
 #pragma once
 #include "LZ77.hpp"
 #include <array>
+#include <queue>
 #include <unordered_map>
 
 namespace deflate
@@ -12,6 +13,15 @@ namespace deflate
     class Huffman
     {
     private:
+
+        enum class NodeType
+        {
+            NONE = 0,
+            LITERAL,
+            LENGTH,
+            DISTANCE,
+        };
+
         struct Node
         {
             std::uint32_t parentId{0};
@@ -21,6 +31,7 @@ namespace deflate
             std::int16_t symbol{-1};
             std::uint8_t codeLength{0};
             std::uint32_t frequency{0};
+            NodeType nodeType{NodeType::NONE};
         };
 
         struct NodeCompare
@@ -28,19 +39,6 @@ namespace deflate
             bool operator()(const std::uint32_t left, const std::uint32_t right) const
             {
                 return left > right;
-            }
-        };
-
-        struct NodeSort
-        {
-            bool operator()(const Node &left, const Node &right) const
-            {
-                if (left.codeLength == right.codeLength)
-                {
-                    return left.symbol < right.symbol;
-                }
-
-                return left.codeLength < right.codeLength;
             }
         };
 
@@ -58,6 +56,7 @@ namespace deflate
             std::uint8_t codeLength;
             std::uint8_t extraBitsCount;
             std::uint16_t extraBits;
+            std::uint8_t index;
         };
         struct DistanceCode
         {
@@ -65,28 +64,27 @@ namespace deflate
             std::uint16_t distance;
             std::uint8_t extraBitsCount;
             std::uint16_t extraBits;
+            std::uint8_t index;
         };
 
-        static std::uint16_t reverseBits(std::uint16_t n, std::uint8_t bitCount)
-        {
-            std::uint16_t result = 0;
-            for (std::uint8_t i = 0; i < bitCount; ++i)
-            {
-                result |= ((n >> i) & 1) << (bitCount - 1 - i);
-            }
-            return result;
-        }
-
-
         using TreeNodes = std::vector<Node>;
-        static constexpr std::uint16_t LITERALS_AND_LENGTHS_ALPHABET_SIZE = 286;
+        using Frequencies = std::tuple<std::vector<uint32_t>,std::vector<uint32_t> ,std::vector<uint32_t>>;
+        using MinimalHeap = std::priority_queue<std::uint32_t, std::vector<std::uint32_t>, NodeCompare>;
+
+        static constexpr std::uint16_t MAX_LENGTH  = 258;
+        static constexpr std::uint16_t MAX_DISTANCE = 32768;
+        static constexpr std::uint16_t MAX_LITERAL = 255;
+        static constexpr std::uint16_t DISTANCES_ALPHABET_SIZE = 30;
+        static constexpr std::uint16_t LITERALS_AND_DISTANCES_ALPHABET_SIZE = 285;
+        static constexpr std::uint8_t MAX_BITS = 15;
+
         static constexpr auto FIXED_LITERALS_CODES{
                 []() constexpr
                 {
-                    std::array<LiteralCode, 256> result{};
+                    std::array<LiteralCode, MAX_LITERAL + 1> result{};
                     std::uint16_t start = 0b00110000;
                     std::uint8_t countOfBits = 8;
-                    for (auto i = 0; i < 256; ++i)
+                    for (auto i = 0; i < MAX_LITERAL; ++i)
                     {
                         if (i == 144)
                         {
@@ -110,11 +108,10 @@ namespace deflate
                 }()};
 
 
-        static constexpr std::uint16_t DISTANCES_ALPHABET_SIZE = 30;
         static constexpr auto FIXED_DISTANCES_CODES{
                 []() constexpr
                 {
-                    std::array<DistanceCode, 32769> result{};
+                    std::array<DistanceCode, MAX_DISTANCE + 1> result{};
                     std::uint8_t bits{0};
                     std::uint16_t mask = 0;
                     std::uint16_t lastDistance = 1;
@@ -143,6 +140,7 @@ namespace deflate
                             code.distance = lastDistance;
                             code.extraBitsCount = bits;
                             code.extraBits = j;
+                            code.index = i;
 
                             result[lastDistance] = code;
                             lastDistance++;
@@ -154,13 +152,13 @@ namespace deflate
         static constexpr auto FIXED_LENGTHS_CODES{
                 []() constexpr
                 {
-                    std::array<LengthCode, 259> result{};
+                    std::array<LengthCode, MAX_LENGTH + 1> result{};
                     std::uint16_t start = 0b0000000;
                     std::uint8_t countOfBits = 7;
                     std::uint8_t extraBitsCount{0};
                     std::uint16_t length{1};
                     std::uint8_t mask{0};
-                    for (auto i = 256; i < 285; i++)
+                    for (std::uint16_t i = MAX_LITERAL + 1; i < LITERALS_AND_DISTANCES_ALPHABET_SIZE; i++)
                     {
                         if (i == 280)
                         {
@@ -193,6 +191,7 @@ namespace deflate
                         for (std::uint16_t j = 0; j <= mask; j++)
                         {
 
+                            result[length].index = static_cast<std::uint8_t>(i - 256);
                             result[length].length = length;
                             result[length].code = reversedCode;
                             result[length].codeLength = countOfBits;
@@ -212,11 +211,12 @@ namespace deflate
                     return result;
                 }()};
 
-        static constexpr std::uint8_t MAX_BITS = 15;
-        static std::pair<std::vector<std::uint16_t>, std::vector<uint16_t>> lz77MatchesToVectors(const std::vector<LZ77::Match> &lz77Matches);
-        static std::vector<std::uint32_t> countFrequencies(const std::vector<std::uint16_t> &data, std::uint16_t alphabetSize);
-        static TreeNodes buildTree(const std::vector<std::uint32_t> &frequencies);
+        static deflate::Huffman::Frequencies countFrequencies(const std::vector<LZ77::Match> &lz77Matches);
+        static TreeNodes buildLiteralsAndLengthsTree(const std::vector<std::uint32_t> &literalsFrequencies, const std::vector<std::uint32_t> &lengthsFrequencies);
+        static void buildTree(MinimalHeap& minimalHeap,TreeNodes &treeNodes);
+        static TreeNodes buildCanonicalTree(const TreeNodes &standardTreeNodes);
         static void calculateCodesLengths(TreeNodes &treeNodes, std::uint32_t rootIndex);
+        static void createCodes(TreeNodes &treeNodes, std::uint32_t rootIndex);
         static std::unordered_map<std::uint16_t, std::uint16_t> createCodeTable(const std::vector<std::uint8_t> &codeLengths);
         static std::unordered_map<std::uint16_t, std::uint16_t> createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths);
         static void addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, std::uint8_t &bitPosition, std::byte &currentByte);

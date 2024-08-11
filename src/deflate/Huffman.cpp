@@ -10,81 +10,44 @@
 #include <queue>
 #include <stack>
 
-std::pair<std::vector<std::uint16_t>, std::vector<uint16_t>> deflate::Huffman::lz77MatchesToVectors(const std::vector<LZ77::Match> &lz77Matches)
+deflate::Huffman::TreeNodes deflate::Huffman::buildLiteralsAndLengthsTree(const std::vector<std::uint32_t> &literalsFrequencies, const std::vector<std::uint32_t> &lengthsFrequencies)
 {
-    std::vector<std::uint16_t> literalsAndLengths;
-    literalsAndLengths.reserve(lz77Matches.size());
-
-    std::vector<std::uint16_t> distances;
-    distances.reserve(lz77Matches.size());
-
-    for (const auto &match: lz77Matches)
-    {
-        if (match.length > 1)
-        {
-            literalsAndLengths.push_back(match.length);
-            distances.push_back(match.distance);
-        }
-        else
-        {
-            literalsAndLengths.push_back(static_cast<std::uint16_t>(match.literal));
-        }
-    }
-
-    return {literalsAndLengths, distances};
-}
-
-std::vector<std::uint32_t> deflate::Huffman::countFrequencies(const std::vector<std::uint16_t> &data, std::uint16_t alphabetSize)
-{
-    std::vector<std::uint32_t> frequencies(alphabetSize, 0);
-
-    for (const auto &symbol: data)
-    {
-        frequencies[symbol]++;
-    }
-    return frequencies;
-}
-deflate::Huffman::TreeNodes deflate::Huffman::buildTree(const std::vector<std::uint32_t> &frequencies)
-{
-    std::priority_queue<std::uint32_t, std::vector<std::uint32_t>, NodeCompare> minimalHeap;
+    MinimalHeap minimalHeap;
     TreeNodes treeNodes;
-    treeNodes.reserve(frequencies.size());
+    treeNodes.reserve(literalsFrequencies.size() + lengthsFrequencies.size());
 
-    for (std::int16_t i = 0; i < frequencies.size(); i++)
+    for(std::int16_t i = 0;i < static_cast<std::int16_t>(literalsFrequencies.size()); i++)
     {
-        if (frequencies[i] > 0)
+        if(literalsFrequencies[i] > 0)
         {
             Node node;
-            node.frequency = frequencies[i];
+            node.frequency = literalsFrequencies[i];
             node.symbol = i;
+            node.nodeType = NodeType::LITERAL;
             treeNodes.push_back(node);
-            minimalHeap.push(treeNodes.size() - 1);
+            minimalHeap.push(static_cast<std::uint32_t>(treeNodes.size() - 1));
+        }
+
+    }
+
+    for (std::int16_t i = 0; i < static_cast<std::int16_t>(lengthsFrequencies.size()); i++)
+    {
+        if(lengthsFrequencies[i])
+        {
+            Node node;
+            node.frequency = lengthsFrequencies[i];
+            node.symbol = i;
+            node.nodeType = NodeType::LENGTH;
+            treeNodes.push_back(node);
+            minimalHeap.push(static_cast<std::uint32_t>(treeNodes.size() - 1));
         }
     }
 
-    while (minimalHeap.size() > 1)
-    {
-        auto left = minimalHeap.top();
-        minimalHeap.pop();
+    buildTree(minimalHeap, treeNodes);
+    calculateCodesLengths(treeNodes,static_cast<std::uint32_t>(treeNodes.size() - 1));
+    auto canonicalTreeNodes = buildCanonicalTree(treeNodes);
 
-        auto right = minimalHeap.top();
-        minimalHeap.pop();
-
-        auto newFrequency = treeNodes[left].frequency + treeNodes[right].frequency;
-        Node node;
-        node.frequency = newFrequency;
-        node.leftChildId = left;
-        node.rightChildId = right;
-        treeNodes.push_back(node);
-
-        auto parentIndex = treeNodes.size() - 1;
-        treeNodes[left].parentId = parentIndex;
-        treeNodes[right].parentId = parentIndex;
-
-        minimalHeap.push(parentIndex);
-    }
-
-    return treeNodes;
+    return canonicalTreeNodes;
 }
 
 void deflate::Huffman::calculateCodesLengths(deflate::Huffman::TreeNodes &treeNodes, std::uint32_t rootIndex)
@@ -103,7 +66,7 @@ void deflate::Huffman::calculateCodesLengths(deflate::Huffman::TreeNodes &treeNo
         stack.pop();
 
         auto &node = treeNodes[nodesIndex];
-        if (node.leftChildId == -1 && node.rightChildId == -1)
+        if ((node.frequency != 0) && (node.leftChildId == -1) && (node.rightChildId == -1))
         {
             node.codeLength = currentLength;
         }
@@ -125,15 +88,10 @@ std::vector<std::byte> deflate::Huffman::encodeWithDynamicCodes(const std::vecto
 {
     std::vector<std::byte> compressedData;
     compressedData.reserve(lz77CompressedData.size());
-    auto [literalsAndLengths, distances] = lz77MatchesToVectors(lz77CompressedData);
+    const auto[literalsFrequencies, lengthsFrequencies, distancesFrequencies] = countFrequencies(lz77CompressedData);
 
-    auto frequencies = countFrequencies(literalsAndLengths, LITERALS_AND_LENGTHS_ALPHABET_SIZE);
-    auto treeNodes = buildTree(frequencies);
-    calculateCodesLengths(treeNodes, treeNodes.size() - 1);
-
-    std::ranges::sort(treeNodes, NodeSort());
-    std::vector<std::uint8_t> codeLengths = {3, 3, 3, 3, 3, 2, 4, 4};
-    auto codeTable = createCodeTable(codeLengths);
+    auto literalsAndLengthsTreeNodes = buildLiteralsAndLengthsTree(literalsFrequencies,lengthsFrequencies);
+    createCodes(literalsAndLengthsTreeNodes,literalsAndLengthsTreeNodes.size() - 1);
 
 
     return compressedData;
@@ -341,8 +299,7 @@ std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const s
     auto tryDecodeDistance = [&]()
     {
         //find distance with code
-        auto distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode);
-        if (distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
+        if (auto distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
         {
             //try read extra bits if code has extra bits
             if (distanceCodeIterator->extraBitsCount > 0)
@@ -393,8 +350,7 @@ std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const s
 
         if ((codeBitPosition == 8) || (codeBitPosition == 9))
         {
-            auto literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode);
-            if (literalsCodesIterator != FIXED_LITERALS_CODES.cend())
+            if (auto literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
             {
                 currentLiteral = literalsCodesIterator->literal;
                 code = 0;
@@ -439,4 +395,123 @@ std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const s
         }
     }
     return lz77Decompressed;
+}
+
+deflate::Huffman::Frequencies deflate::Huffman::countFrequencies(const std::vector<LZ77::Match> &lz77Matches)
+{
+    std::vector<std::uint32_t> literalsFrequencies(MAX_LITERAL,0);
+    std::vector<uint32_t> lengthsFrequencies(LITERALS_AND_DISTANCES_ALPHABET_SIZE - MAX_LITERAL,0);
+    std::vector<uint32_t> distancesFrequencies(DISTANCES_ALPHABET_SIZE,0);
+
+    for (const auto &match: lz77Matches)
+    {
+        if (match.length > 1)
+        {
+            const auto &lengthCode = FIXED_LENGTHS_CODES[match.length];
+            const auto &distanceCode = FIXED_DISTANCES_CODES[match.distance];
+
+            lengthsFrequencies[lengthCode.index]++;
+            distancesFrequencies[distanceCode.index]++;
+        }
+        else
+        {
+            literalsFrequencies[static_cast<std::uint8_t>(match.literal)]++;
+        }
+    }
+
+    Frequencies frequencies;
+    std::get<0>(frequencies) = literalsFrequencies;
+    std::get<1>(frequencies) = lengthsFrequencies;
+    std::get<1>(frequencies) = distancesFrequencies;
+
+    return frequencies;
+}
+
+void deflate::Huffman::buildTree(std::priority_queue<std::uint32_t, std::vector<std::uint32_t>, NodeCompare> &minimalHeap, TreeNodes &treeNodes)
+{
+    while (minimalHeap.size() > 1)
+    {
+        auto left = minimalHeap.top();
+        minimalHeap.pop();
+
+        auto right = minimalHeap.top();
+        minimalHeap.pop();
+
+        auto newFrequency = treeNodes[left].frequency + treeNodes[right].frequency;
+        Node node;
+        node.frequency = newFrequency;
+        node.leftChildId = static_cast<std::int32_t>(left);
+        node.rightChildId = static_cast<std::int32_t>(right);
+        treeNodes.push_back(node);
+
+        auto parentIndex = treeNodes.size() - 1;
+        treeNodes[left].parentId = static_cast<std::uint32_t>(parentIndex);
+        treeNodes[right].parentId = static_cast<std::uint32_t>(parentIndex);
+
+        minimalHeap.push(static_cast<std::int32_t>(parentIndex));
+    }
+}
+deflate::Huffman::TreeNodes deflate::Huffman::buildCanonicalTree(const TreeNodes &standardTreeNodes)
+{
+    TreeNodes canonicalTreeNodes;
+    canonicalTreeNodes.reserve(standardTreeNodes.size());
+    std::ranges::copy(standardTreeNodes,std::back_inserter(canonicalTreeNodes));
+    MinimalHeap minimalHeap;
+
+    while (minimalHeap.size() > 1)
+    {
+        auto left = minimalHeap.top();
+        minimalHeap.pop();
+
+        auto right = minimalHeap.top();
+        minimalHeap.pop();
+
+        Node node;
+        node.leftChildId = static_cast<std::int32_t>(left);
+        node.rightChildId = static_cast<std::int32_t>(right);
+        canonicalTreeNodes.push_back(node);
+
+        auto parentIndex = canonicalTreeNodes.size() - 1;
+        canonicalTreeNodes[left].parentId = static_cast<std::uint32_t>(parentIndex);
+        canonicalTreeNodes[right].parentId = static_cast<std::uint32_t>(parentIndex);
+
+        minimalHeap.push(static_cast<std::int32_t>(parentIndex));
+    }
+
+    return canonicalTreeNodes;
+}
+
+void deflate::Huffman::createCodes(deflate::Huffman::TreeNodes &treeNodes, std::uint32_t rootIndex)
+{
+    if (rootIndex == -1)
+    {
+        return;
+    }
+
+    std::stack<std::pair<std::uint32_t, std::string>> stack;
+    stack.emplace(rootIndex, "");
+
+    while (!stack.empty())
+    {
+        auto [nodesIndex, currentCode] = stack.top();
+        stack.pop();
+
+        auto &node = treeNodes[nodesIndex];
+        if ((node.frequency != 0) && (node.leftChildId == -1) && (node.rightChildId == -1))
+        {
+            std::cout << static_cast<std::uint16_t>(node.codeLength) <<  " " <<  currentCode << "\n";
+            node.code = std::bitset<16>(currentCode).to_ulong();
+        }
+        else
+        {
+            if (node.rightChildId != -1)
+            {
+                stack.emplace(node.rightChildId, currentCode + "1");
+            }
+            if (node.leftChildId != -1)
+            {
+                stack.emplace(node.leftChildId, currentCode + "0");
+            }
+        }
+    }
 }
