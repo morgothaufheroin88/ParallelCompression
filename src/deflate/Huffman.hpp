@@ -204,7 +204,7 @@ namespace deflate
                         for (std::uint16_t j = 0; j <= mask; j++)
                         {
 
-                            result[length].index = static_cast<std::uint8_t>(i - 256);
+                            result[length].index = static_cast<std::uint8_t>(i - 255);
                             result[length].length = length;
                             result[length].code = reversedCode;
                             result[length].codeLength = countOfBits;
@@ -226,12 +226,15 @@ namespace deflate
 
         static deflate::Huffman::Frequencies countFrequencies(const std::vector<LZ77::Match> &lz77Matches);
         static TreeNodes buildLiteralsAndLengthsTree(const std::vector<std::uint32_t> &literalsFrequencies, const std::vector<std::uint32_t> &lengthsFrequencies);
+        static TreeNodes buildDistancesTree(const std::vector<std::uint32_t> &distancesFrequencies);
         static void buildTree(MinimalHeap &minimalHeap, TreeNodes &treeNodes);
         static void calculateCodesLengths(TreeNodes &treeNodes, std::uint32_t rootIndex);
         static std::vector<std::uint8_t> getLengthsFromNodes(const TreeNodes &treeNodes, std::uint16_t size);
         static DynamicCodeTable createCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
         static DynamicCodeTable createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
         static DynamicCodeTable createCodeTableForLiterals(const std::vector<uint32_t> &literalsFrequencies, const std::vector<uint32_t> &lengthsFrequencies);
+        static DynamicCodeTable createCodeTableForDistances(const std::vector<uint32_t> &distancesFrequencies);
+
         static void addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, std::uint8_t &bitPosition, std::byte &currentByte);
 
     public:

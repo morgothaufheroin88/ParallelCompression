@@ -90,6 +90,8 @@ std::vector<std::byte> deflate::Huffman::encodeWithDynamicCodes(const std::vecto
 
     auto literalsCodeTable = createCodeTableForLiterals(literalsFrequencies, lengthsFrequencies);
 
+    auto distancesCodeTable = createCodeTableForDistances(distancesFrequencies);
+
     return compressedData;
 }
 
@@ -419,7 +421,7 @@ deflate::Huffman::Frequencies deflate::Huffman::countFrequencies(const std::vect
     Frequencies frequencies;
     std::get<0>(frequencies) = literalsFrequencies;
     std::get<1>(frequencies) = lengthsFrequencies;
-    std::get<1>(frequencies) = distancesFrequencies;
+    std::get<2>(frequencies) = distancesFrequencies;
 
     return frequencies;
 }
@@ -470,4 +472,38 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(
     auto literalsCodesLengths = getLengthsFromNodes(literalsAndLengthsTreeNodes, LITERALS_AND_DISTANCES_ALPHABET_SIZE + 1);
 
     return createCodeTable(literalsCodesLengths, LITERALS_AND_DISTANCES_ALPHABET_SIZE);
+}
+
+deflate::Huffman::TreeNodes deflate::Huffman::buildDistancesTree(const std::vector<std::uint32_t> &distancesFrequencies)
+{
+    MinimalHeap minimalHeap;
+    TreeNodes treeNodes;
+    treeNodes.reserve(distancesFrequencies.size());
+
+    for (std::int16_t i = 0; i < static_cast<std::int16_t>(distancesFrequencies.size()); i++)
+    {
+        if (distancesFrequencies[i] > 0)
+        {
+            Node node;
+            node.frequency = distancesFrequencies[i];
+            node.symbol = i;
+            node.nodeType = NodeType::DISTANCE;
+            treeNodes.push_back(node);
+            minimalHeap.push(static_cast<std::uint32_t>(treeNodes.size() - 1));
+        }
+    }
+
+    buildTree(minimalHeap, treeNodes);
+    calculateCodesLengths(treeNodes, static_cast<std::uint32_t>(treeNodes.size() - 1));
+    return treeNodes;
+}
+
+deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForDistances(const std::vector<uint32_t> &distancesFrequencies)
+{
+    auto distancesTreeNodes = buildDistancesTree(distancesFrequencies);
+
+    std::ranges::sort(distancesTreeNodes, NodeSortCompare());
+    auto literalsCodesLengths = getLengthsFromNodes(distancesTreeNodes, DISTANCES_ALPHABET_SIZE + 1);
+
+    return createCodeTable(literalsCodesLengths, DISTANCES_ALPHABET_SIZE);
 }
