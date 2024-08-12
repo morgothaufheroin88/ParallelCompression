@@ -4,11 +4,11 @@
 
 #include "Huffman.hpp"
 #include <algorithm>
-#include <array>
 #include <bitset>
 #include <iostream>
-#include <queue>
+#include <ranges>
 #include <stack>
+
 
 deflate::Huffman::TreeNodes deflate::Huffman::buildLiteralsAndLengthsTree(const std::vector<std::uint32_t> &literalsFrequencies, const std::vector<std::uint32_t> &lengthsFrequencies)
 {
@@ -16,9 +16,9 @@ deflate::Huffman::TreeNodes deflate::Huffman::buildLiteralsAndLengthsTree(const 
     TreeNodes treeNodes;
     treeNodes.reserve(literalsFrequencies.size() + lengthsFrequencies.size());
 
-    for(std::int16_t i = 0;i < static_cast<std::int16_t>(literalsFrequencies.size()); i++)
+    for (std::int16_t i = 0; i < static_cast<std::int16_t>(literalsFrequencies.size()); i++)
     {
-        if(literalsFrequencies[i] > 0)
+        if (literalsFrequencies[i] > 0)
         {
             Node node;
             node.frequency = literalsFrequencies[i];
@@ -27,16 +27,15 @@ deflate::Huffman::TreeNodes deflate::Huffman::buildLiteralsAndLengthsTree(const 
             treeNodes.push_back(node);
             minimalHeap.push(static_cast<std::uint32_t>(treeNodes.size() - 1));
         }
-
     }
 
     for (std::int16_t i = 0; i < static_cast<std::int16_t>(lengthsFrequencies.size()); i++)
     {
-        if(lengthsFrequencies[i])
+        if (lengthsFrequencies[i])
         {
             Node node;
             node.frequency = lengthsFrequencies[i];
-            node.symbol = i;
+            node.symbol = MAX_LITERAL + i;
             node.nodeType = NodeType::LENGTH;
             treeNodes.push_back(node);
             minimalHeap.push(static_cast<std::uint32_t>(treeNodes.size() - 1));
@@ -44,10 +43,8 @@ deflate::Huffman::TreeNodes deflate::Huffman::buildLiteralsAndLengthsTree(const 
     }
 
     buildTree(minimalHeap, treeNodes);
-    calculateCodesLengths(treeNodes,static_cast<std::uint32_t>(treeNodes.size() - 1));
-    auto canonicalTreeNodes = buildCanonicalTree(treeNodes);
-
-    return canonicalTreeNodes;
+    calculateCodesLengths(treeNodes, static_cast<std::uint32_t>(treeNodes.size() - 1));
+    return treeNodes;
 }
 
 void deflate::Huffman::calculateCodesLengths(deflate::Huffman::TreeNodes &treeNodes, std::uint32_t rootIndex)
@@ -88,18 +85,17 @@ std::vector<std::byte> deflate::Huffman::encodeWithDynamicCodes(const std::vecto
 {
     std::vector<std::byte> compressedData;
     compressedData.reserve(lz77CompressedData.size());
-    const auto[literalsFrequencies, lengthsFrequencies, distancesFrequencies] = countFrequencies(lz77CompressedData);
 
-    auto literalsAndLengthsTreeNodes = buildLiteralsAndLengthsTree(literalsFrequencies,lengthsFrequencies);
-    createCodes(literalsAndLengthsTreeNodes,literalsAndLengthsTreeNodes.size() - 1);
+    const auto [literalsFrequencies, lengthsFrequencies, distancesFrequencies] = countFrequencies(lz77CompressedData);
 
+    auto literalsCodeTable = createCodeTableForLiterals(literalsFrequencies, lengthsFrequencies);
 
     return compressedData;
 }
 
-std::unordered_map<std::uint16_t, std::uint16_t> deflate::Huffman::createCodeTable(const std::vector<std::uint8_t> &codeLengths)
+deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize)
 {
-    std::unordered_map<std::uint16_t, std::uint16_t> codeTable;
+    DynamicCodeTable codeTable(codeTableSize);
     codeTable.reserve(codeLengths.size());
 
     std::array<std::uint16_t, MAX_BITS + 1> codeLengthsCount = {0};
@@ -113,28 +109,29 @@ std::unordered_map<std::uint16_t, std::uint16_t> deflate::Huffman::createCodeTab
     std::uint16_t code{0};
     for (std::uint8_t bit = 1; bit <= MAX_BITS; bit++)
     {
-        code = (code + codeLengthsCount[bit - 1]) << 1;
+        code = static_cast<std::uint16_t>((code + codeLengthsCount[bit - 1]) << 1);
         nextCode[bit] = code;
     }
 
-
-    for (std::uint32_t i = 0; i < codeLengths.size(); i++)
+    std::uint16_t symbol{0};
+    for (auto length: codeLengths)
     {
-        auto length = codeLengths[i];
         if (length != 0)
         {
-            codeTable[nextCode[length]] = 0;
+            std::cout << symbol << " " << std::bitset<16>(nextCode[length]).to_string().substr(16 - length, 16) << "\n";
+            codeTable[nextCode[length]] = symbol;
             nextCode[length]++;
         }
+        symbol++;
     }
 
     return codeTable;
 }
 
-std::unordered_map<std::uint16_t, std::uint16_t> deflate::Huffman::createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths)
+deflate::Huffman::DynamicCodeTable deflate::Huffman::createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize)
 {
-    auto codeTable = createCodeTable(codeLengths);
-    std::unordered_map<std::uint16_t, std::uint16_t> reverseCodeTable;
+    auto codeTable = createCodeTable(codeLengths, codeTableSize);
+    DynamicCodeTable reverseCodeTable;
     reverseCodeTable.reserve(codeLengths.size());
 
     for (const auto &[code, symbol]: codeTable)
@@ -399,9 +396,9 @@ std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const s
 
 deflate::Huffman::Frequencies deflate::Huffman::countFrequencies(const std::vector<LZ77::Match> &lz77Matches)
 {
-    std::vector<std::uint32_t> literalsFrequencies(MAX_LITERAL,0);
-    std::vector<uint32_t> lengthsFrequencies(LITERALS_AND_DISTANCES_ALPHABET_SIZE - MAX_LITERAL,0);
-    std::vector<uint32_t> distancesFrequencies(DISTANCES_ALPHABET_SIZE,0);
+    std::vector<std::uint32_t> literalsFrequencies(MAX_LITERAL, 0);
+    std::vector<uint32_t> lengthsFrequencies(LITERALS_AND_DISTANCES_ALPHABET_SIZE - MAX_LITERAL, 0);
+    std::vector<uint32_t> distancesFrequencies(DISTANCES_ALPHABET_SIZE, 0);
 
     for (const auto &match: lz77Matches)
     {
@@ -451,67 +448,26 @@ void deflate::Huffman::buildTree(std::priority_queue<std::uint32_t, std::vector<
         minimalHeap.push(static_cast<std::int32_t>(parentIndex));
     }
 }
-deflate::Huffman::TreeNodes deflate::Huffman::buildCanonicalTree(const TreeNodes &standardTreeNodes)
+
+std::vector<std::uint8_t> deflate::Huffman::getLengthsFromNodes(const deflate::Huffman::TreeNodes &treeNodes, std::uint16_t size)
 {
-    TreeNodes canonicalTreeNodes;
-    canonicalTreeNodes.reserve(standardTreeNodes.size());
-    std::ranges::copy(standardTreeNodes,std::back_inserter(canonicalTreeNodes));
-    MinimalHeap minimalHeap;
-
-    while (minimalHeap.size() > 1)
+    std::vector<std::uint8_t> lengths(size, 0);
+    for (const auto &node: treeNodes)
     {
-        auto left = minimalHeap.top();
-        minimalHeap.pop();
-
-        auto right = minimalHeap.top();
-        minimalHeap.pop();
-
-        Node node;
-        node.leftChildId = static_cast<std::int32_t>(left);
-        node.rightChildId = static_cast<std::int32_t>(right);
-        canonicalTreeNodes.push_back(node);
-
-        auto parentIndex = canonicalTreeNodes.size() - 1;
-        canonicalTreeNodes[left].parentId = static_cast<std::uint32_t>(parentIndex);
-        canonicalTreeNodes[right].parentId = static_cast<std::uint32_t>(parentIndex);
-
-        minimalHeap.push(static_cast<std::int32_t>(parentIndex));
+        if (node.symbol > -1)
+        {
+            lengths[node.symbol] = node.codeLength;
+        }
     }
-
-    return canonicalTreeNodes;
+    return lengths;
 }
 
-void deflate::Huffman::createCodes(deflate::Huffman::TreeNodes &treeNodes, std::uint32_t rootIndex)
+deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(const std::vector<uint32_t> &literalsFrequencies, const std::vector<uint32_t> &lengthsFrequencies)
 {
-    if (rootIndex == -1)
-    {
-        return;
-    }
+    auto literalsAndLengthsTreeNodes = buildLiteralsAndLengthsTree(literalsFrequencies, lengthsFrequencies);
 
-    std::stack<std::pair<std::uint32_t, std::string>> stack;
-    stack.emplace(rootIndex, "");
+    std::ranges::sort(literalsAndLengthsTreeNodes, NodeSortCompare());
+    auto literalsCodesLengths = getLengthsFromNodes(literalsAndLengthsTreeNodes, LITERALS_AND_DISTANCES_ALPHABET_SIZE + 1);
 
-    while (!stack.empty())
-    {
-        auto [nodesIndex, currentCode] = stack.top();
-        stack.pop();
-
-        auto &node = treeNodes[nodesIndex];
-        if ((node.frequency != 0) && (node.leftChildId == -1) && (node.rightChildId == -1))
-        {
-            std::cout << static_cast<std::uint16_t>(node.codeLength) <<  " " <<  currentCode << "\n";
-            node.code = std::bitset<16>(currentCode).to_ulong();
-        }
-        else
-        {
-            if (node.rightChildId != -1)
-            {
-                stack.emplace(node.rightChildId, currentCode + "1");
-            }
-            if (node.leftChildId != -1)
-            {
-                stack.emplace(node.leftChildId, currentCode + "0");
-            }
-        }
-    }
+    return createCodeTable(literalsCodesLengths, LITERALS_AND_DISTANCES_ALPHABET_SIZE);
 }

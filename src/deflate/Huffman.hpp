@@ -13,7 +13,6 @@ namespace deflate
     class Huffman
     {
     private:
-
         enum class NodeType
         {
             NONE = 0,
@@ -34,11 +33,24 @@ namespace deflate
             NodeType nodeType{NodeType::NONE};
         };
 
+
         struct NodeCompare
         {
             bool operator()(const std::uint32_t left, const std::uint32_t right) const
             {
                 return left > right;
+            }
+        };
+
+        struct NodeSortCompare
+        {
+            bool operator()(const Node &a, const Node &b) const
+            {
+                if (a.codeLength == b.codeLength)
+                {
+                    return a.symbol < b.symbol;
+                }
+                return a.codeLength < b.codeLength;
             }
         };
 
@@ -68,12 +80,13 @@ namespace deflate
         };
 
         using TreeNodes = std::vector<Node>;
-        using Frequencies = std::tuple<std::vector<uint32_t>,std::vector<uint32_t> ,std::vector<uint32_t>>;
+        using Frequencies = std::tuple<std::vector<uint32_t>, std::vector<uint32_t>, std::vector<uint32_t>>;
         using MinimalHeap = std::priority_queue<std::uint32_t, std::vector<std::uint32_t>, NodeCompare>;
+        using DynamicCodeTable = std::unordered_map<std::uint16_t, std::uint16_t>;
 
-        static constexpr std::uint16_t MAX_LENGTH  = 258;
+        static constexpr std::uint16_t MAX_LENGTH = 258;
         static constexpr std::uint16_t MAX_DISTANCE = 32768;
-        static constexpr std::uint16_t MAX_LITERAL = 255;
+        static constexpr std::int16_t MAX_LITERAL = 255;
         static constexpr std::uint16_t DISTANCES_ALPHABET_SIZE = 30;
         static constexpr std::uint16_t LITERALS_AND_DISTANCES_ALPHABET_SIZE = 285;
         static constexpr std::uint8_t MAX_BITS = 15;
@@ -213,12 +226,12 @@ namespace deflate
 
         static deflate::Huffman::Frequencies countFrequencies(const std::vector<LZ77::Match> &lz77Matches);
         static TreeNodes buildLiteralsAndLengthsTree(const std::vector<std::uint32_t> &literalsFrequencies, const std::vector<std::uint32_t> &lengthsFrequencies);
-        static void buildTree(MinimalHeap& minimalHeap,TreeNodes &treeNodes);
-        static TreeNodes buildCanonicalTree(const TreeNodes &standardTreeNodes);
+        static void buildTree(MinimalHeap &minimalHeap, TreeNodes &treeNodes);
         static void calculateCodesLengths(TreeNodes &treeNodes, std::uint32_t rootIndex);
-        static void createCodes(TreeNodes &treeNodes, std::uint32_t rootIndex);
-        static std::unordered_map<std::uint16_t, std::uint16_t> createCodeTable(const std::vector<std::uint8_t> &codeLengths);
-        static std::unordered_map<std::uint16_t, std::uint16_t> createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths);
+        static std::vector<std::uint8_t> getLengthsFromNodes(const TreeNodes &treeNodes, std::uint16_t size);
+        static DynamicCodeTable createCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
+        static DynamicCodeTable createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
+        static DynamicCodeTable createCodeTableForLiterals(const std::vector<uint32_t> &literalsFrequencies, const std::vector<uint32_t> &lengthsFrequencies);
         static void addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, std::uint8_t &bitPosition, std::byte &currentByte);
 
     public:
