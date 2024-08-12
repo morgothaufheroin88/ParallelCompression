@@ -468,6 +468,13 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(
 {
     auto literalsAndLengthsTreeNodes = buildLiteralsAndLengthsTree(literalsFrequencies, lengthsFrequencies);
 
+    if (literalsAndLengthsTreeNodes.size() == 1)
+    {
+        DynamicCodeTable codeTable;
+        codeTable[literalsAndLengthsTreeNodes[0].symbol] = 0;
+        return codeTable;
+    }
+
     std::ranges::sort(literalsAndLengthsTreeNodes, NodeSortCompare());
     auto literalsCodesLengths = getLengthsFromNodes(literalsAndLengthsTreeNodes, LITERALS_AND_DISTANCES_ALPHABET_SIZE + 1);
 
@@ -501,6 +508,13 @@ deflate::Huffman::TreeNodes deflate::Huffman::buildDistancesTree(const std::vect
 deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForDistances(const std::vector<uint32_t> &distancesFrequencies)
 {
     auto distancesTreeNodes = buildDistancesTree(distancesFrequencies);
+
+    if (distancesTreeNodes.size() == 1)
+    {
+        DynamicCodeTable codeTable;
+        codeTable[distancesTreeNodes[0].symbol] = 0;
+        return codeTable;
+    }
 
     std::ranges::sort(distancesTreeNodes, NodeSortCompare());
     auto literalsCodesLengths = getLengthsFromNodes(distancesTreeNodes, DISTANCES_ALPHABET_SIZE + 1);
