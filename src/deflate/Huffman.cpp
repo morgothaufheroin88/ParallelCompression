@@ -470,7 +470,8 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(
 
     if (literalsAndLengthsTreeNodes.size() == 1)
     {
-        DynamicCodeTable codeTable;
+
+        DynamicCodeTable codeTable(LITERALS_AND_DISTANCES_ALPHABET_SIZE);
         codeTable[literalsAndLengthsTreeNodes[0].symbol] = 0;
         return codeTable;
     }
@@ -511,7 +512,7 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForDistances
 
     if (distancesTreeNodes.size() == 1)
     {
-        DynamicCodeTable codeTable;
+        DynamicCodeTable codeTable(DISTANCES_ALPHABET_SIZE);
         codeTable[distancesTreeNodes[0].symbol] = 0;
         return codeTable;
     }
