@@ -121,7 +121,11 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTable(const std::
         if (length != 0)
         {
             std::cout << symbol << " " << std::bitset<16>(nextCode[length]).to_string().substr(16 - length, 16) << "\n";
-            codeTable[nextCode[length]] = symbol;
+
+            CanonicalHuffmanCode canonicalHuffmanCode;
+            canonicalHuffmanCode.code = nextCode[length];
+            canonicalHuffmanCode.length = length;
+            codeTable[symbol] = canonicalHuffmanCode;
             nextCode[length]++;
         }
         symbol++;
@@ -470,9 +474,11 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(
 
     if (literalsAndLengthsTreeNodes.size() == 1)
     {
-
         DynamicCodeTable codeTable(LITERALS_AND_DISTANCES_ALPHABET_SIZE);
-        codeTable[literalsAndLengthsTreeNodes[0].symbol] = 0;
+        CanonicalHuffmanCode code;
+        code.code = 1;
+        code.length = 1;
+        codeTable[literalsAndLengthsTreeNodes[0].symbol] = code;
         return codeTable;
     }
 
@@ -513,7 +519,10 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForDistances
     if (distancesTreeNodes.size() == 1)
     {
         DynamicCodeTable codeTable(DISTANCES_ALPHABET_SIZE);
-        codeTable[distancesTreeNodes[0].symbol] = 0;
+        CanonicalHuffmanCode code;
+        code.code = 1;
+        code.length = 1;
+        codeTable[distancesTreeNodes[0].symbol] = code;
         return codeTable;
     }
 

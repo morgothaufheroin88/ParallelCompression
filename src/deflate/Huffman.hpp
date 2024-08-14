@@ -79,10 +79,16 @@ namespace deflate
             std::uint8_t index;
         };
 
+        struct CanonicalHuffmanCode
+        {
+            std::uint16_t code{0};
+            std::uint8_t length{0};
+        };
+
         using TreeNodes = std::vector<Node>;
         using Frequencies = std::tuple<std::vector<uint32_t>, std::vector<uint32_t>, std::vector<uint32_t>>;
         using MinimalHeap = std::priority_queue<std::uint32_t, std::vector<std::uint32_t>, NodeCompare>;
-        using DynamicCodeTable = std::unordered_map<std::uint16_t, std::uint16_t>;
+        using DynamicCodeTable = std::unordered_map<std::uint16_t, CanonicalHuffmanCode>;
 
         static constexpr std::uint16_t MAX_LENGTH = 258;
         static constexpr std::uint16_t MAX_DISTANCE = 32768;
