@@ -484,6 +484,7 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(
 
     std::ranges::sort(literalsAndLengthsTreeNodes, NodeSortCompare());
     auto literalsCodesLengths = getLengthsFromNodes(literalsAndLengthsTreeNodes, LITERALS_AND_DISTANCES_ALPHABET_SIZE + 1);
+    createShortSequence(literalsCodesLengths);
 
     return createCodeTable(literalsCodesLengths, LITERALS_AND_DISTANCES_ALPHABET_SIZE);
 }
@@ -528,6 +529,112 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForDistances
 
     std::ranges::sort(distancesTreeNodes, NodeSortCompare());
     auto literalsCodesLengths = getLengthsFromNodes(distancesTreeNodes, DISTANCES_ALPHABET_SIZE + 1);
+    createShortSequence(literalsCodesLengths);
 
     return createCodeTable(literalsCodesLengths, DISTANCES_ALPHABET_SIZE);
+}
+
+std::vector<std::uint16_t> deflate::Huffman::createShortSequence(const std::vector<std::uint8_t> &codeLengths)
+{
+    std::vector<std::uint8_t> cl;
+    std::ranges::copy(codeLengths, std::back_inserter(cl));
+
+    auto uniquesRange = std::ranges::unique(cl);
+    cl.erase(uniquesRange.begin(), uniquesRange.end());
+
+    std::vector<std::uint16_t> rleCodes;
+    rleCodes.reserve(cl.size());
+
+    auto findRange = [](const auto &rangeBegin, const auto &rangeEnd, auto target)
+    {
+        auto first = std::ranges::find(rangeBegin, rangeEnd, target);
+        if (first != rangeEnd)
+        {
+            auto last = std::ranges::find_if_not(first, rangeEnd, [target](int n)
+                                                 { return n == target; });
+            return std::make_pair(first, last);
+        }
+        return std::make_pair(rangeEnd, rangeEnd);
+    };
+
+    std::int64_t offset{0};
+    auto codeLengthsBegin = codeLengths.begin();
+
+    for (auto length: cl)
+    {
+        auto [first, last] = findRange(codeLengthsBegin + offset, codeLengths.end(), length);
+        auto lengthCount = std::ranges::count(first, last, length);
+        offset += lengthCount;
+
+        //encode length with run-length encoding described in RFC1951
+        //see https://datatracker.ietf.org/doc/html/rfc1951#page-13
+        createRLECodes(rleCodes, length, static_cast<std::int16_t>(lengthCount));
+    }
+
+    return rleCodes;
+}
+
+void deflate::Huffman::createRLECodes(std::vector<std::uint16_t> &rleCodes, std::uint8_t length, std::int16_t count)
+{
+    if (count >= 3)
+    {
+        count--;
+    }
+
+    if (length == 0)
+    {
+        if (count >= 3 && count <= 10)
+        {
+            rleCodes.push_back(0);
+            rleCodes.push_back(17);
+            rleCodes.push_back(count - 3);
+        }
+        else if (count > 10)
+        {
+            rleCodes.push_back(0);
+            rleCodes.push_back(18);
+            rleCodes.push_back(count - 11);
+        }
+        else
+        {
+            for (int i = 0; i < count; i++)
+            {
+                rleCodes.push_back(length);
+            }
+        }
+    }
+    else if (count >= 3 && count <= 6)
+    {
+        rleCodes.push_back(length);
+        rleCodes.push_back(16);
+        rleCodes.push_back(count - 3);
+    }
+    else if (count < 3)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            rleCodes.push_back(length);
+        }
+    }
+    else if (count > 6)
+    {
+        while (count > 0)
+        {
+            auto repeatCount = std::min(count, static_cast<std::int16_t>(6));
+            if (repeatCount > 2)
+            {
+                rleCodes.push_back(length);
+                rleCodes.push_back(16);
+                rleCodes.push_back(count - 3);
+            }
+            else
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    rleCodes.push_back(length);
+                }
+            }
+            count -= repeatCount;
+        }
+    }
 }

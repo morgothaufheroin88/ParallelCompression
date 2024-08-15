@@ -5,6 +5,7 @@
 #pragma once
 #include "LZ77.hpp"
 #include <array>
+#include <optional>
 #include <queue>
 #include <unordered_map>
 
@@ -230,7 +231,9 @@ namespace deflate
                     return result;
                 }()};
 
-        static deflate::Huffman::Frequencies countFrequencies(const std::vector<LZ77::Match> &lz77Matches);
+        static std::vector<std::uint16_t> createShortSequence(const std::vector<std::uint8_t> &codeLengths);
+        static void createRLECodes(std::vector<std::uint16_t> &rleCodes, std::uint8_t length, std::int16_t count);
+        static Frequencies countFrequencies(const std::vector<LZ77::Match> &lz77Matches);
         static TreeNodes buildLiteralsAndLengthsTree(const std::vector<std::uint32_t> &literalsFrequencies, const std::vector<std::uint32_t> &lengthsFrequencies);
         static TreeNodes buildDistancesTree(const std::vector<std::uint32_t> &distancesFrequencies);
         static void buildTree(MinimalHeap &minimalHeap, TreeNodes &treeNodes);
@@ -240,7 +243,6 @@ namespace deflate
         static DynamicCodeTable createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
         static DynamicCodeTable createCodeTableForLiterals(const std::vector<uint32_t> &literalsFrequencies, const std::vector<uint32_t> &lengthsFrequencies);
         static DynamicCodeTable createCodeTableForDistances(const std::vector<uint32_t> &distancesFrequencies);
-
         static void addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, std::uint8_t &bitPosition, std::byte &currentByte);
 
     public:
