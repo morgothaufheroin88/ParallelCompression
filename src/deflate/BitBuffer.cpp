@@ -6,6 +6,7 @@
 
 deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(newBuffer)
 {
+    currentByte = newBuffer[0];
 }
 
 std::uint8_t deflate::BitBuffer::readBit()
@@ -36,7 +37,7 @@ std::uint32_t deflate::BitBuffer::readBits(const std::size_t numberOfBits)
     return result;
 }
 
-void deflate::BitBuffer::writeBits(std::uint32_t value,std::size_t numberOfBits)
+void deflate::BitBuffer::writeBits(std::uint32_t value, std::size_t numberOfBits)
 {
     while (numberOfBits > 0)
     {
