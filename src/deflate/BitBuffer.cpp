@@ -10,7 +10,7 @@ deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(
 
 std::uint8_t deflate::BitBuffer::readBit()
 {
-    if(buffer.empty())
+    if (buffer.empty())
     {
         return 0;
     }
