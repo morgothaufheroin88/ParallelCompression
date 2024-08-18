@@ -105,18 +105,19 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTable(const std::
 
     for (const auto &length: codeLengths)
     {
-        codeLengthsCount[length]++;
+        auto &value = codeLengthsCount[length];
+        ++value;
     }
 
     std::uint16_t code{0};
-    for (std::uint8_t bit = 1; bit <= MAX_BITS; bit++)
+    for (std::uint8_t bit = 1; bit <= MAX_BITS; ++bit)
     {
         code = static_cast<std::uint16_t>((code + codeLengthsCount[bit - 1]) << 1);
         nextCode[bit] = code;
     }
 
     std::uint16_t symbol{0};
-    for (auto length: codeLengths)
+    for (const auto length: codeLengths)
     {
         if (length != 0)
         {
@@ -126,9 +127,10 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTable(const std::
             canonicalHuffmanCode.code = nextCode[length];
             canonicalHuffmanCode.length = length;
             codeTable[symbol] = canonicalHuffmanCode;
-            nextCode[length]++;
+            auto& value = nextCode[length];
+            ++value;
         }
-        symbol++;
+        ++symbol;
     }
 
     return codeTable;
@@ -147,67 +149,12 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createReverseCodeTable(cons
     return reverseCodeTable;
 }
 
-std::vector<std::byte> deflate::Huffman::encodeWithFixedCodes(const std::vector<LZ77::Match> &lz77CompressedData, bool isLastBlock)
-{
-    std::vector<std::byte> compressedData;
-    compressedData.reserve(lz77CompressedData.size());
-
-    std::byte currentByte{0};
-    std::uint8_t bitPosition = 0;
-
-    //write header
-    if (isLastBlock)
-    {
-        addBitsToBuffer(compressedData, 1, 1, bitPosition, currentByte);
-    }
-    else
-    {
-        addBitsToBuffer(compressedData, 0, 1, bitPosition, currentByte);
-    }
-
-    addBitsToBuffer(compressedData, 0b01, 2, bitPosition, currentByte);
-
-
-    for (const auto &lz77Match: lz77CompressedData)
-    {
-        if (lz77Match.length > 1)
-        {
-            const auto &lengthCode = FIXED_LENGTHS_CODES[lz77Match.length];
-            const auto &distanceCode = FIXED_DISTANCES_CODES[lz77Match.distance];
-
-            //encode lz77 lengths
-            addBitsToBuffer(compressedData, lengthCode.code, lengthCode.codeLength, bitPosition, currentByte);
-            addBitsToBuffer(compressedData, lengthCode.extraBits, lengthCode.extraBitsCount, bitPosition, currentByte);
-
-            //encode lz77 distance
-            addBitsToBuffer(compressedData, distanceCode.code, 5, bitPosition, currentByte);
-            addBitsToBuffer(compressedData, distanceCode.extraBits, distanceCode.extraBitsCount, bitPosition, currentByte);
-        }
-        else
-        {
-            const auto &literalCode = FIXED_LITERALS_CODES[static_cast<std::uint8_t>(lz77Match.literal)];
-
-            //encode lz77 literal
-            addBitsToBuffer(compressedData, literalCode.code, literalCode.codeLength, bitPosition, currentByte);
-        }
-    }
-
-    //write end of block
-    addBitsToBuffer(compressedData, 0, 7, bitPosition, currentByte);
-    if (bitPosition > 0)
-    {
-        compressedData.push_back(currentByte);
-    }
-
-    return compressedData;
-}
-
 void deflate::Huffman::addBitsToBuffer(std::vector<std::byte> &buffer, std::uint16_t value, std::uint8_t bitCount, uint8_t &bitPosition, std::byte &currentByte)
 {
     while (bitCount > 0)
     {
-        auto bitsToWrite = std::min(bitCount, static_cast<std::uint8_t>(8 - bitPosition));
-        auto bits = std::byte((value & ((1 << bitsToWrite) - 1)) << bitPosition);
+        const auto bitsToWrite = std::min(bitCount, static_cast<std::uint8_t>(8 - bitPosition));
+        const auto bits = static_cast<std::byte>((value & ((1 << bitsToWrite) - 1)) << bitPosition);
         currentByte |= bits;
 
         bitPosition += bitsToWrite;
@@ -222,7 +169,7 @@ void deflate::Huffman::addBitsToBuffer(std::vector<std::byte> &buffer, std::uint
         }
     }
 }
-
+/*
 std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const std::vector<std::byte> &compressedData)
 {
 
@@ -429,18 +376,19 @@ deflate::Huffman::Frequencies deflate::Huffman::countFrequencies(const std::vect
 
     return frequencies;
 }
+*/
 
 void deflate::Huffman::buildTree(std::priority_queue<std::uint32_t, std::vector<std::uint32_t>, NodeCompare> &minimalHeap, TreeNodes &treeNodes)
 {
     while (minimalHeap.size() > 1)
     {
-        auto left = minimalHeap.top();
+        const auto left = minimalHeap.top();
         minimalHeap.pop();
 
-        auto right = minimalHeap.top();
+        const auto right = minimalHeap.top();
         minimalHeap.pop();
 
-        auto newFrequency = treeNodes[left].frequency + treeNodes[right].frequency;
+        const auto newFrequency = treeNodes[left].frequency + treeNodes[right].frequency;
         Node node;
         node.frequency = newFrequency;
         node.leftChildId = static_cast<std::int32_t>(left);
@@ -483,8 +431,8 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForLiterals(
     }
 
     std::ranges::sort(literalsAndLengthsTreeNodes, NodeSortCompare());
-    auto literalsCodesLengths = getLengthsFromNodes(literalsAndLengthsTreeNodes, LITERALS_AND_DISTANCES_ALPHABET_SIZE + 1);
-    createShortSequence(literalsCodesLengths);
+    const auto literalsCodesLengths = getLengthsFromNodes(literalsAndLengthsTreeNodes, LITERALS_AND_DISTANCES_ALPHABET_SIZE + 1);
+    const auto shortSequence = createShortSequence(literalsCodesLengths);
 
     return createCodeTable(literalsCodesLengths, LITERALS_AND_DISTANCES_ALPHABET_SIZE);
 }
@@ -528,7 +476,7 @@ deflate::Huffman::DynamicCodeTable deflate::Huffman::createCodeTableForDistances
     }
 
     std::ranges::sort(distancesTreeNodes, NodeSortCompare());
-    auto literalsCodesLengths = getLengthsFromNodes(distancesTreeNodes, DISTANCES_ALPHABET_SIZE + 1);
+    const auto literalsCodesLengths = getLengthsFromNodes(distancesTreeNodes, DISTANCES_ALPHABET_SIZE + 1);
     createShortSequence(literalsCodesLengths);
 
     return createCodeTable(literalsCodesLengths, DISTANCES_ALPHABET_SIZE);
@@ -547,8 +495,7 @@ std::vector<std::uint16_t> deflate::Huffman::createShortSequence(const std::vect
 
     auto findRange = [](const auto &rangeBegin, const auto &rangeEnd, auto target)
     {
-        auto first = std::ranges::find(rangeBegin, rangeEnd, target);
-        if (first != rangeEnd)
+        if (auto first = std::ranges::find(rangeBegin, rangeEnd, target); first != rangeEnd)
         {
             auto last = std::ranges::find_if_not(first, rangeEnd, [target](int n)
                                                  { return n == target; });
@@ -568,6 +515,12 @@ std::vector<std::uint16_t> deflate::Huffman::createShortSequence(const std::vect
 
         //encode length with run-length encoding described in RFC1951
         //see https://datatracker.ietf.org/doc/html/rfc1951#page-13
+
+        if (lengthCount >= 3)
+        {
+            --lengthCount;
+        }
+
         createRLECodes(rleCodes, length, static_cast<std::int16_t>(lengthCount));
     }
 
@@ -576,11 +529,6 @@ std::vector<std::uint16_t> deflate::Huffman::createShortSequence(const std::vect
 
 void deflate::Huffman::createRLECodes(std::vector<std::uint16_t> &rleCodes, std::uint8_t length, std::int16_t count)
 {
-    if (count >= 3)
-    {
-        count--;
-    }
-
     if (length == 0)
     {
         if (count >= 3 && count <= 10)
@@ -620,7 +568,7 @@ void deflate::Huffman::createRLECodes(std::vector<std::uint16_t> &rleCodes, std:
     {
         while (count > 0)
         {
-            auto repeatCount = std::min(count, static_cast<std::int16_t>(6));
+            const auto repeatCount = std::min(count, static_cast<std::int16_t>(6));
             if (repeatCount > 2)
             {
                 rleCodes.push_back(length);
@@ -629,7 +577,7 @@ void deflate::Huffman::createRLECodes(std::vector<std::uint16_t> &rleCodes, std:
             }
             else
             {
-                for (int i = 0; i < count; i++)
+                for (std::uint32_t i = 0; i < count; ++i)
                 {
                     rleCodes.push_back(length);
                 }
@@ -637,4 +585,34 @@ void deflate::Huffman::createRLECodes(std::vector<std::uint16_t> &rleCodes, std:
             count -= repeatCount;
         }
     }
+}
+
+deflate::Huffman::DynamicCodeTable deflate::Huffman::createCCL(const std::vector<std::int16_t> &rleCodes)
+{
+    std::unordered_map<std::int16_t,std::int16_t> frequencies;
+
+    MinimalHeap minimalHeap;
+    TreeNodes treeNodes;
+
+    for (auto rleCode: rleCodes)
+    {
+        auto& value = frequencies[rleCode];
+        ++value;
+    }
+
+    for(auto [key,value]: frequencies)
+    {
+        Node node;
+        node.frequency = value;
+        node.symbol = key;
+
+        treeNodes.push_back(node);
+        minimalHeap.push(static_cast<std::uint32_t>(treeNodes.size() - 1));
+
+    }
+
+    buildTree(minimalHeap, treeNodes);
+    calculateCodesLengths(treeNodes, static_cast<std::uint32_t>(treeNodes.size() - 1));
+    const auto ccl = getLengthsFromNodes(treeNodes,treeNodes.size());
+    return createCodeTable(ccl,19);
 }
