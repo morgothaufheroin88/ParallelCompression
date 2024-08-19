@@ -177,9 +177,7 @@ std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const s
     lz77Decompressed.reserve(compressedData.size());
 
     std::uint8_t byteBitPosition{0};
-    std::uint8_t codeBitPosition{0};
     std::size_t byteIndex{0};
-    std::uint16_t code{0};
     std::byte currentLiteral{0};
     std::uint16_t currentLength{0};
     std::uint16_t currentDistance{0};
@@ -202,149 +200,19 @@ std::vector<deflate::LZ77::Match> deflate::Huffman::decodeWithFixedCodes(const s
         return bit;
     };
 
-    auto findCode = [&code](const auto &arrayCode)
-    {
-        return arrayCode.code == code;
-    };
 
-    auto findByExtraBits = [&extraBits, &code](const auto &distanceCode)
-    {
-        return extraBits == distanceCode.extraBits && code == distanceCode.code;
-    };
 
     auto tryDecodeLength = [&]()
     {
-        //find length with code
-        auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findCode);
-        if (lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
-        {
-            //try read extra bits if code has extra bits
-            isNextDistance = true;
-            if (lengthCodesIterator->extraBitsCount > 0)
-            {
-                for (std::uint8_t i = 0; i < lengthCodesIterator->extraBitsCount; i++)
-                {
-                    extraBits |= (readBit() << i);
-                }
 
-                lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByExtraBits);
-
-                if (lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
-                {
-                    currentLength = lengthCodesIterator->length;
-                }
-            }
-            else
-            {
-                currentLength = lengthCodesIterator->length;
-            }
-
-            //reset for new code
-            code = 0;
-            codeBitPosition = 0;
-            extraBits = 0;
-        }
     };
 
     auto tryDecodeDistance = [&]()
     {
-        //find distance with code
-        if (auto distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
-        {
-            //try read extra bits if code has extra bits
-            if (distanceCodeIterator->extraBitsCount > 0)
-            {
-                for (std::uint8_t i = 0; i < distanceCodeIterator->extraBitsCount; i++)
-                {
-                    extraBits |= (readBit() << i);
-                }
 
-                distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByExtraBits);
-
-                if (distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
-                {
-                    currentDistance = distanceCodeIterator->distance;
-                }
-            }
-            else
-            {
-                currentDistance = distanceCodeIterator->distance;
-            }
-        }
-
-        //reset for new code
-        code = 0;
-        codeBitPosition = 0;
-        extraBits = 0;
     };
 
-    while (byteIndex < compressedData.size())
-    {
 
-        //read one bit from byte
-        code |= (readBit() << codeBitPosition);
-        codeBitPosition++;
-
-        //check header magic numbers
-        if (!isHeaderParsed && (codeBitPosition == 3) && ((code == 0b011) || (code == 0b010)))
-        {
-            isHeaderParsed = true;
-            codeBitPosition = 0;
-            code = 0;
-        }
-
-        //check if code is literal or encoded lz77 length with code length = 8
-        //code length with 8 - literals from 0 to 143 or lz77 length from 280 to 287
-        //code length with 9 - literals from 144 to 255
-        //see - https://datatracker.ietf.org/doc/html/rfc1951#page-12 for details
-
-        if ((codeBitPosition == 8) || (codeBitPosition == 9))
-        {
-            if (auto literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
-            {
-                currentLiteral = literalsCodesIterator->literal;
-                code = 0;
-                codeBitPosition = 0;
-            }
-            else
-            {
-                tryDecodeLength();
-            }
-            if (codeBitPosition == 9)
-            {
-                code = 0;
-                codeBitPosition = 0;
-            }
-        }
-        //check if code is  lz77 length with code length = 7
-        //see - https://datatracker.ietf.org/doc/html/rfc1951#page-12 for details
-        else if (codeBitPosition == 7)
-        {
-            tryDecodeLength();
-        }
-        //check if code is  lz77 distance with code length = 5
-        //see - https://datatracker.ietf.org/doc/html/rfc1951#page-12 for details
-        else if (codeBitPosition == 5 && isNextDistance)
-        {
-            isNextDistance = false;
-            tryDecodeDistance();
-        }
-
-        //adding current decoded literal
-        if (static_cast<std::uint8_t>(currentLiteral) != 0)
-        {
-            lz77Decompressed.emplace_back(currentLiteral, 0, 1);
-            currentLiteral = std::byte{0};
-        }
-        //adding current decoded length and distance
-        else if ((currentDistance != 0) && (currentLength != 0))
-        {
-            lz77Decompressed.emplace_back(std::byte{0}, currentDistance, currentLength);
-            currentDistance = 0;
-            currentLength = 0;
-        }
-    }
-    return lz77Decompressed;
 }
 
 deflate::Huffman::Frequencies deflate::Huffman::countFrequencies(const std::vector<LZ77::Match> &lz77Matches)
