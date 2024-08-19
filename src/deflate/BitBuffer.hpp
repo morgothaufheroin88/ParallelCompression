@@ -19,9 +19,10 @@ namespace deflate
     public:
         BitBuffer() = default;
         explicit BitBuffer(const std::vector<std::byte> &newBuffer);
-        std::uint8_t readBit();
-        std::uint32_t readBits(const std::size_t numberOfBits);
-        void writeBits(std::uint32_t value,std::size_t numberOfBits);
+        std::byte readBit();
+        std::uint32_t readBits(std::size_t numberOfBits);
+        void writeBits(std::uint32_t value, std::size_t numberOfBits);
         [[nodiscard]] std::vector<std::byte> getBytes();
+        [[nodiscard]] bool next() const noexcept;
     };
 }// namespace deflate

@@ -9,14 +9,14 @@ deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(
     currentByte = newBuffer[0];
 }
 
-std::uint8_t deflate::BitBuffer::readBit()
+std::byte deflate::BitBuffer::readBit()
 {
     if (buffer.empty())
     {
-        return 0;
+        return std::byte{0};
     }
 
-    const std::uint8_t bit = (static_cast<std::uint16_t>(currentByte) >> bitPosition) & 1;
+    const auto bit = std::byte{(static_cast<std::uint16_t>(currentByte) >> bitPosition) & 1};
     ++bitPosition;
     if (bitPosition == 8)
     {
@@ -32,7 +32,7 @@ std::uint32_t deflate::BitBuffer::readBits(const std::size_t numberOfBits)
     std::uint32_t result = 0;
     for (std::size_t i = 0; i < numberOfBits; ++i)
     {
-        result |= static_cast<std::uint32_t>(static_cast<std::byte>(readBit()) << i);
+        result |= static_cast<std::uint32_t>(readBit() << i);
     }
     return result;
 }
@@ -66,4 +66,9 @@ std::vector<std::byte> deflate::BitBuffer::getBytes()
     }
 
     return buffer;
+}
+
+bool deflate::BitBuffer::next() const noexcept
+{
+    return byteIndex < buffer.size();
 }
