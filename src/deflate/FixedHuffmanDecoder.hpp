@@ -11,7 +11,7 @@
 namespace deflate
 {
     class BitBuffer;
-    class StaticHuffmanDecoder
+    class FixedHuffmanDecoder
     {
     private:
         BitBuffer bitBuffer;
@@ -25,7 +25,7 @@ namespace deflate
         std::optional<std::byte> tryDecodeLiteral();
 
     public:
-        explicit StaticHuffmanDecoder(const BitBuffer &newBitBuffer);
+        explicit FixedHuffmanDecoder(const BitBuffer &newBitBuffer);
         std::vector<LZ77::Match> decodeData();
     };
 }// namespace deflate

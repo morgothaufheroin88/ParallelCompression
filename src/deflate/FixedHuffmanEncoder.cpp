@@ -2,11 +2,11 @@
 // Created by cx9ps3 on 18.08.2024.
 //
 
-#include "StaticHuffmanEncoder.hpp"
 #include "BitBuffer.hpp"
+#include "FixedHuffmanEncoder.hpp"
 #include <cstddef>
 
-std::vector<std::byte> deflate::StaticHuffmanEncoder::encodeData(const std::vector<LZ77::Match> &dataToEncode, const bool isLastBlock)
+std::vector<std::byte> deflate::FixedHuffmanEncoder::encodeData(const std::vector<LZ77::Match> &dataToEncode, const bool isLastBlock)
 {
     constexpr auto FIXED_LITERALS_CODES{initializeFixedCodesForLiterals()};
     constexpr auto FIXED_DISTANCES_CODES{initializeFixedCodesForDistances()};

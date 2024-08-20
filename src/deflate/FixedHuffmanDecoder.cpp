@@ -2,14 +2,14 @@
 // Created by cx9ps3 on 18.08.2024.
 //
 
-#include "StaticHuffmanDecoder.hpp"
-#include "StaticHuffmanEncoder.hpp"
+#include "FixedHuffmanDecoder.hpp"
+#include "FixedHuffmanEncoder.hpp"
 
 #include <array>
 #include <cassert>
 
 
-void deflate::StaticHuffmanDecoder::resetCode()
+void deflate::FixedHuffmanDecoder::resetCode()
 {
     //reset for new code
     code = 0;
@@ -17,9 +17,9 @@ void deflate::StaticHuffmanDecoder::resetCode()
     extraBits = 0;
 }
 
-std::optional<std::uint16_t> deflate::StaticHuffmanDecoder::tryDecodeLength()
+std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
 {
-    auto FIXED_LENGTHS_CODES = StaticHuffmanEncoder::initializeFixedCodesForLengths();
+    auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
 
     auto findCode = [this](const auto &arrayCode)
     {
@@ -50,9 +50,9 @@ std::optional<std::uint16_t> deflate::StaticHuffmanDecoder::tryDecodeLength()
     return std::nullopt;
 }
 
-std::optional<std::uint16_t> deflate::StaticHuffmanDecoder::tryDecodeDistance()
+std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance()
 {
-    auto FIXED_DISTANCES_CODES = StaticHuffmanEncoder::initializeFixedCodesForDistances();
+    auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
 
     auto findCode = [this](const auto &arrayCode)
     {
@@ -82,14 +82,14 @@ std::optional<std::uint16_t> deflate::StaticHuffmanDecoder::tryDecodeDistance()
     return std::nullopt;
 }
 
-std::optional<std::byte> deflate::StaticHuffmanDecoder::tryDecodeLiteral()
+std::optional<std::byte> deflate::FixedHuffmanDecoder::tryDecodeLiteral()
 {
     auto findCode = [this](const auto &arrayCode)
     {
         return arrayCode.code == code;
     };
 
-    auto FIXED_LITERALS_CODES = StaticHuffmanEncoder::initializeFixedCodesForLiterals();
+    auto FIXED_LITERALS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLiterals();
     if (const auto* const literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
     {
         resetCode();
@@ -99,11 +99,11 @@ std::optional<std::byte> deflate::StaticHuffmanDecoder::tryDecodeLiteral()
     return std::nullopt;
 }
 
-deflate::StaticHuffmanDecoder::StaticHuffmanDecoder(const BitBuffer &newBitBuffer) : bitBuffer(newBitBuffer)
+deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const BitBuffer &newBitBuffer) : bitBuffer(newBitBuffer)
 {
 }
 
-std::vector<deflate::LZ77::Match> deflate::StaticHuffmanDecoder::decodeData()
+std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
 {
     bool isHeaderParsed = false;
     std::uint16_t distance{0};

@@ -11,7 +11,7 @@
 
 namespace deflate
 {
-    class StaticHuffmanEncoder
+    class FixedHuffmanEncoder
     {
     private:
         struct LiteralCode
