@@ -11,11 +11,10 @@
 
 std::vector<std::uint32_t> deflate::HuffmanTree::countFrequencies(const std::vector<std::int16_t> &symbols, const std::size_t alphabetSize) const
 {
-    std::vector<std::uint32_t> frequencies(0, static_cast<std::vector<std::uint32_t>::value_type>(alphabetSize));
+    std::vector<std::uint32_t> frequencies(static_cast<std::vector<std::uint32_t>::value_type>(alphabetSize), 0);
     for (const auto symbol: symbols)
     {
-        auto &value = frequencies[static_cast<uint16_t>(symbol)];
-        ++value;
+        ++frequencies[static_cast<uint16_t>(symbol)];
     }
 
     return frequencies;
@@ -106,6 +105,12 @@ std::vector<std::uint8_t> deflate::HuffmanTree::getLengthsFromNodes(const std::u
             lengths[static_cast<std::uint16_t>(node.symbol)] = node.codeLength;
         }
     }
+
+    while (lengths.back() == 0)
+    {
+        lengths.pop_back();
+    }
+
     return lengths;
 }
 

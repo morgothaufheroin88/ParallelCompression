@@ -55,7 +55,7 @@ namespace deflate
         void calculateCodesLengths(std::int32_t rootIndex);
 
     public:
-        std::vector<std::uint8_t> getLengthsFromNodes(std::uint16_t size) const;
+        [[nodiscard]] std::vector<std::uint8_t> getLengthsFromNodes(std::uint16_t size) const;
         explicit HuffmanTree(const std::vector<std::int16_t> &symbols, std::size_t alphabetSize);
     };
 
@@ -79,7 +79,6 @@ namespace deflate
         };
 
         static constexpr std::uint8_t MAX_BITS = 15;
-
         using DynamicCodeTable = std::unordered_map<std::uint16_t, CanonicalHuffmanCode>;
         using ReverseDynamicCodeTable = std::unordered_map<CanonicalHuffmanCode, std::uint16_t, CanonicalHuffmanCodesHash>;
 
