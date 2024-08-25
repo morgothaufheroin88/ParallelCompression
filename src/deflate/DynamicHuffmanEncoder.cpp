@@ -7,112 +7,33 @@
 #include "BitBuffer.hpp"
 #include "FixedHuffmanEncoder.hpp"
 #include <algorithm>
+#include <bitset>
+#include <iostream>
 
-void deflate::DynamicHuffmanEncoder::createShortSequence(const std::vector<std::uint8_t> &codeLengths)
+std::uint32_t deflate::DynamicHuffmanEncoder::reverseBits(const std::uint32_t bits, const std::uint8_t bitsCount) const
 {
-    std::vector<std::uint8_t> cl;
-    std::ranges::copy(codeLengths, std::back_inserter(cl));
-
-    const auto uniquesRange = std::ranges::unique(cl);
-    cl.erase(uniquesRange.begin(), uniquesRange.end());
-
-    shortSequence.reserve(cl.size());
-
-    auto findRange = [](const auto &rangeBegin, const auto &rangeEnd, auto target)
+    std::uint16_t reversedCode = 0;
+    for (std::uint8_t j = 0; j < bitsCount; ++j)
     {
-        if (auto first = std::ranges::find(rangeBegin, rangeEnd, target); first != rangeEnd)
-        {
-            auto last = std::ranges::find_if_not(first, rangeEnd, [target](const std::int32_t n)
-                                                 { return n == target; });
-            return std::make_pair(first, last);
-        }
-        return std::make_pair(rangeEnd, rangeEnd);
-    };
-
-    std::int64_t offset{0};
-    const auto codeLengthsBegin = codeLengths.begin();
-
-    for (const auto length: cl)
-    {
-        const auto [first, last] = findRange(codeLengthsBegin + offset, codeLengths.end(), length);
-        auto lengthCount = std::ranges::count(first, last, length);
-        offset += lengthCount;
-
-        //encode length with run-length encoding described in RFC1951
-        //see https://datatracker.ietf.org/doc/html/rfc1951#page-13
-
-        if (lengthCount >= 3)
-        {
-            --lengthCount;
-        }
-
-        createRLECodes(length, static_cast<std::int16_t>(lengthCount));
+        reversedCode |= ((bits >> j) & 1U) << (bitsCount - 1U - j);
     }
-}
-void deflate::DynamicHuffmanEncoder::createRLECodes(const std::uint8_t length, std::int16_t count)
-{
-    auto pushRemainingLengths = [count](std::vector<std::int16_t> &codes, const std::uint8_t value)
-    {
-        for (std::int16_t i = 0; i < count; ++i)
-        {
-            codes.push_back(value);
-        }
-    };
-
-    if (length == 0)
-    {
-        if ((count >= 3) && (count <= 10))
-        {
-            shortSequence.push_back(0);
-            shortSequence.push_back(17);
-            shortSequenceExtraBits.emplace_back(static_cast<std::uint8_t>(count - 3), 3);
-        }
-        else if (count > 10)
-        {
-            shortSequence.push_back(0);
-            shortSequence.push_back(18);
-            shortSequenceExtraBits.emplace_back(static_cast<std::uint8_t>(count - 11), 7);
-        }
-        else
-        {
-            pushRemainingLengths(shortSequence, length);
-        }
-    }
-    else if ((count >= 3) && (count <= 6))
-    {
-        shortSequence.push_back(length);
-        shortSequence.push_back(16);
-        shortSequenceExtraBits.emplace_back(static_cast<std::uint8_t>(count - 3), 2);
-    }
-    else if (count < 3)
-    {
-        pushRemainingLengths(shortSequence, length);
-    }
-    else if (count > 6)
-    {
-        while (count > 0)
-        {
-            const auto repeatCount = std::min(count, static_cast<std::int16_t>(6));
-            if (repeatCount > 2)
-            {
-                shortSequence.push_back(length);
-                shortSequence.push_back(16);
-                shortSequenceExtraBits.emplace_back(static_cast<std::uint8_t>(count - 3), 2);
-            }
-            else
-            {
-                pushRemainingLengths(shortSequence, length);
-            }
-            count -= repeatCount;
-        }
-    }
+    return reversedCode;
 }
 
 void deflate::DynamicHuffmanEncoder::encodeCodeLengths(const std::vector<std::uint8_t> &lengths)
 {
-    createShortSequence(lengths);
+    std::vector<std::int16_t> sq;
+    auto it = lengths.begin();
+    while (it != lengths.end())
+    {
+        std::uint32_t extraBits = 0;
+        std::uint32_t extraBitsLength = 0;
 
-    const HuffmanTree huffmanTree(shortSequence, 19);
+        const auto code = encodeCodeLength(lengths, it, extraBits, extraBitsLength);
+        sq.push_back(static_cast<std::int16_t>(code));
+    }
+
+    const HuffmanTree huffmanTree(sq, 19);
     const auto ccl = huffmanTree.getLengthsFromNodes(19);
 
     constexpr std::array<std::uint8_t, 19> permuteOrder = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
@@ -144,19 +65,61 @@ void deflate::DynamicHuffmanEncoder::encodeCodeLengths(const std::vector<std::ui
 
     auto codeTable = CodeTable::createCodeTable(ccl, 19);
 
-    std::uint16_t extraBitsIndex{0};
-    for (const auto length: shortSequence)
+    it = lengths.begin();
+    while (it != lengths.end())
     {
-        const auto [code, codeLength] = codeTable[static_cast<std::uint16_t>(length)];
-        bitBuffer.writeBits(static_cast<std::uint32_t>(code), codeLength);
+        std::uint32_t extraBits = 0;
+        std::uint32_t extraBitsLength = 0;
+        const auto code = encodeCodeLength(lengths, it, extraBits, extraBitsLength);
+        const auto [tableCode, tableCodeLength] = codeTable[static_cast<std::uint16_t>(code)];
 
-        if ((length == 16) || (length == 17) || (length == 18))
+        bitBuffer.writeBits(reverseBits(tableCode, tableCodeLength), tableCodeLength);
+        bitBuffer.writeBits(extraBits, extraBitsLength);
+    }
+}
+
+void deflate::DynamicHuffmanEncoder::encodeLZ77Matches(const std::vector<LZ77::Match> &lz77Matches)
+{
+    auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
+    auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
+
+    auto literalsCodeTable = CodeTable::createCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
+    auto distancesCodeTable = CodeTable::createCodeTable(distancesCodeLengths, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
+
+    for (const auto &match: lz77Matches)
+    {
+        if (match.length > 1)
         {
-            const auto [extraBits, extraBitsLength] = shortSequenceExtraBits[extraBitsIndex];
-            bitBuffer.writeBits(static_cast<std::uint32_t>(extraBits), extraBitsLength);
-            ++extraBitsIndex;
+            const auto &lengthFixedCode = FIXED_LENGTHS_CODES[match.length];
+            const auto &distanceFixedCode = FIXED_DISTANCES_CODES[match.distance];
+
+            const auto &lengthCode = literalsCodeTable[lengthFixedCode.index + 255];
+            const auto &distanceCode = distancesCodeTable[distanceFixedCode.index + 1];
+
+            //encode length with extra bits if exists
+            bitBuffer.writeBits(reverseBits(lengthCode.code, lengthCode.length), lengthCode.length);
+            if (lengthFixedCode.extraBitsCount > 0)
+            {
+                bitBuffer.writeBits(lengthFixedCode.extraBits, lengthFixedCode.extraBitsCount);
+            }
+
+            //encode distance with extra bits if exists
+            bitBuffer.writeBits(reverseBits(distanceCode.code, distanceCode.length), distanceCode.length);
+            if (distanceFixedCode.extraBitsCount > 0)
+            {
+                bitBuffer.writeBits(distanceFixedCode.extraBits, distanceFixedCode.extraBitsCount);
+            }
+        }
+        else
+        {
+            const auto &literalsCode = literalsCodeTable[static_cast<std::uint16_t>(match.literal)];
+            bitBuffer.writeBits(reverseBits(literalsCode.code, literalsCode.length), literalsCode.length);
         }
     }
+
+    //write end of block
+    const auto endOfBlockCode = literalsCodeTable[256];
+    bitBuffer.writeBits(reverseBits(endOfBlockCode.code, endOfBlockCode.length), endOfBlockCode.length);
 }
 
 std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vector<LZ77::Match> &lz77Matches, const bool isLastBlock)
@@ -167,7 +130,6 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
     auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
     auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
 
-
     for (const auto &match: lz77Matches)
     {
         if (match.length > 1)
@@ -176,22 +138,20 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
             const auto &distanceCode = FIXED_DISTANCES_CODES[match.distance];
 
             literalsAndLengths.push_back(lengthCode.index + 255);
-            distances.push_back(distanceCode.index);
+            distances.push_back(distanceCode.index + 1);
         }
         else
         {
             literalsAndLengths.push_back(static_cast<std::int16_t>(match.literal));
         }
     }
+    literalsAndLengths.push_back(256);
 
     const HuffmanTree literalsAndLengthsTree(literalsAndLengths, FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
     const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
-    const auto literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
-    auto distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
-
-    std::ranges::copy(distancesCodeLengths, std::back_inserter(literalsAndLengths));
-
+    literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
+    distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
     //write header
     if (isLastBlock)
@@ -206,13 +166,21 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
     bitBuffer.writeBits(0b10, 2);
 
     //write HLIT
-    bitBuffer.writeBits(static_cast<std::uint32_t>(literalsAndLengths.size() - 257), 5);
+    bitBuffer.writeBits(static_cast<std::uint32_t>(literalsCodeLengths.size() - 257), 5);
 
     //write HDIST
     bitBuffer.writeBits(static_cast<std::uint32_t>(distancesCodeLengths.size() - 1), 5);
 
+    std::vector<std::uint8_t> literalsAndDistancesCodesLengths;
+
+    std::ranges::copy(literalsCodeLengths, std::back_inserter(literalsAndDistancesCodesLengths));
+    std::ranges::copy(distancesCodeLengths, std::back_inserter(literalsAndDistancesCodesLengths));
+
     //write encoded lengths
-    encodeCodeLengths(literalsCodeLengths);
+    encodeCodeLengths(literalsAndDistancesCodesLengths);
+
+    //write data
+    encodeLZ77Matches(lz77Matches);
 
     return bitBuffer.getBytes();
 }
