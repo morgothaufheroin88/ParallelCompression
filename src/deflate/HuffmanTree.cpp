@@ -97,7 +97,18 @@ void deflate::HuffmanTree::calculateCodesLengths(std::int32_t rootIndex)
 
 std::vector<std::uint8_t> deflate::HuffmanTree::getLengthsFromNodes(const std::uint16_t size) const
 {
+
     std::vector<std::uint8_t> lengths(size, 0);
+    if (treeNodes.size() == 1)
+    {
+        lengths[static_cast<std::uint16_t>(treeNodes[0].symbol)] = 1;
+        while (lengths.back() == 0)
+        {
+            lengths.pop_back();
+        }
+        return lengths;
+    }
+
     for (const auto &node: treeNodes)
     {
         if (node.symbol > -1)
@@ -159,7 +170,6 @@ deflate::CodeTable::DynamicCodeTable deflate::CodeTable::createCodeTable(const s
     {
         if (length != 0)
         {
-            std::cout << symbol << " " << std::bitset<16>(nextCode[length]).to_string().substr(16 - length, 16) << "\n";
             CanonicalHuffmanCode canonicalHuffmanCode;
             canonicalHuffmanCode.code = nextCode[length];
             canonicalHuffmanCode.length = length;
