@@ -185,11 +185,13 @@ deflate::CodeTable::DynamicCodeTable deflate::CodeTable::createCodeTable(const s
 
 deflate::CodeTable::ReverseDynamicCodeTable deflate::CodeTable::createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, const std::uint16_t codeTableSize)
 {
-    const auto codeTable = createCodeTable(codeLengths, codeTableSize);
+    auto codeTable = createCodeTable(codeLengths, codeTableSize);
     ReverseDynamicCodeTable reverseCodeTable(codeLengths.size());
 
-    for (const auto &[symbol, code]: codeTable)
+    for (auto &[symbol, code]: codeTable)
     {
+        const auto mask = (1 << static_cast<std::uint16_t>(code.length)) - 1;
+        code.code = code.code & mask;
         reverseCodeTable[code] = symbol;
     }
     return reverseCodeTable;
