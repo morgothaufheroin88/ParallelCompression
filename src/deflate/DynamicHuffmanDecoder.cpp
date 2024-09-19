@@ -63,10 +63,21 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
     std::uint8_t codeBitPosition{0};
     std::uint16_t previousLength{0};
 
-    for (const auto &[code, codeLength]: reverseCodeTable)
+    auto repeatNumbers = [&i, this](const std::uint32_t repeat, const std::uint8_t number)
     {
-        std::cout << std::bitset<16>(code.code).to_string().substr(16 - code.length, 16) << " val = " << codeLength << std::endl;
-    }
+        for (std::uint32_t j = 0; j < repeat; ++j)
+        {
+            if(i < (HLIT + 257))
+            {
+                literalsCodeLengths.push_back(number);
+            }
+            else
+            {
+                distanceCodeLengths.push_back(number);
+            }
+            ++i;
+        }
+    };
 
     while (i < codeLengthsCount)
     {
@@ -74,25 +85,31 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
         code |= std::to_integer<std::uint16_t>(bitBuffer.readBit() << codeBitPosition);
         ++codeBitPosition;
 
-        auto reversedBits = reverseBits(code, codeBitPosition);
+        const auto reversedBits = reverseBits(code, codeBitPosition);
 
         const auto it = std::ranges::find_if(reverseCodeTable, [reversedBits, codeBitPosition](const auto &pair)
                                              { return (pair.first.code == reversedBits) && (pair.first.length == codeBitPosition); });
 
         if (it != reverseCodeTable.end())
         {
-            ++i;
             if (it->second == 18)
             {
-                auto repeat = bitBuffer.readBits(7);
+                const auto repeat = bitBuffer.readBits(7);
+                repeatNumbers(repeat + 11, 0);
             }
             else if (it->second == 17)
             {
-                auto repeat = bitBuffer.readBits(3);
+                const auto repeat = bitBuffer.readBits(3);
+                repeatNumbers(repeat + 3, 0);
             }
             else if ((previousLength < 16) && (previousLength > 0) && (it->second == 16))
             {
-                auto repeat = bitBuffer.readBits(2);
+                const auto repeat = bitBuffer.readBits(2);
+                repeatNumbers(repeat + 3, static_cast<std::uint8_t>(previousLength));
+            }
+            else
+            {
+                repeatNumbers(1,static_cast<std::uint8_t>(it->second));
             }
 
             previousLength = it->second;
