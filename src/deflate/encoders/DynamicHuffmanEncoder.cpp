@@ -3,11 +3,8 @@
 //
 
 #include "DynamicHuffmanEncoder.hpp"
-
-#include "BitBuffer.hpp"
 #include "FixedHuffmanEncoder.hpp"
 #include <algorithm>
-#include <bitset>
 #include <iostream>
 
 std::uint32_t deflate::DynamicHuffmanEncoder::reverseBits(const std::uint32_t bits, const std::uint8_t bitsCount) const

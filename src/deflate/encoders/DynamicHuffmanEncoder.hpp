@@ -3,9 +3,9 @@
 //
 
 #pragma once
-#include "BitBuffer.hpp"
-#include "HuffmanTree.hpp"
-#include "LZ77.hpp"
+#include "../buffer/BitBuffer.hpp"
+#include "../tree/HuffmanTree.hpp"
+#include "../lz/LZ77.hpp"
 
 
 namespace deflate

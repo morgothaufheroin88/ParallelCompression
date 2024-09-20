@@ -3,7 +3,7 @@
 //
 
 #include "FixedHuffmanDecoder.hpp"
-#include "FixedHuffmanEncoder.hpp"
+#include "../encoders/FixedHuffmanEncoder.hpp"
 
 #include <array>
 #include <cassert>

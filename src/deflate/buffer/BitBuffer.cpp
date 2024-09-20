@@ -16,7 +16,7 @@ std::byte deflate::BitBuffer::readBit()
         return std::byte{0};
     }
 
-    const auto bit = std::byte{(static_cast<std::uint16_t>(currentByte) >> bitPosition) & 1};
+    const auto bit = std::byte{static_cast<std::uint8_t>(static_cast<std::uint16_t>(currentByte) >> bitPosition & 1)};
     ++bitPosition;
     if (bitPosition == 8)
     {

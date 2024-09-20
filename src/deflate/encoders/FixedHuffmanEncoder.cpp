@@ -2,7 +2,7 @@
 // Created by cx9ps3 on 18.08.2024.
 //
 
-#include "BitBuffer.hpp"
+#include "../buffer/BitBuffer.hpp"
 #include "FixedHuffmanEncoder.hpp"
 #include <cstddef>
 

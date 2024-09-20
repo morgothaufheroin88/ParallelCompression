@@ -3,8 +3,8 @@
 //
 
 #pragma once
-#include "BitBuffer.hpp"
-#include "LZ77.hpp"
+#include "../buffer/BitBuffer.hpp"
+#include "../lz/LZ77.hpp"
 #include <cstdint>
 #include <optional>
 

@@ -3,7 +3,7 @@
 //
 
 #pragma once
-#include "LZ77.hpp"
+#include "../lz/LZ77.hpp"
 
 #include <array>
 #include <cstdint>

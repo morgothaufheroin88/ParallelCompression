@@ -3,8 +3,7 @@
 //
 
 #include "DynamicHuffmanDecoder.hpp"
-#include "FixedHuffmanEncoder.hpp"
-#include "HuffmanTree.hpp"
+#include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
 #include <cassert>
 
