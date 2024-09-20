@@ -79,10 +79,10 @@ namespace deflate
         };
 
         static constexpr std::uint8_t MAX_BITS = 15;
-        using DynamicCodeTable = std::unordered_map<std::uint16_t, CanonicalHuffmanCode>;
-        using ReverseDynamicCodeTable = std::unordered_map<CanonicalHuffmanCode, std::uint16_t, CanonicalHuffmanCodesHash>;
 
     public:
+        using DynamicCodeTable = std::unordered_map<std::uint16_t, CanonicalHuffmanCode>;
+        using ReverseDynamicCodeTable = std::unordered_map<CanonicalHuffmanCode, std::uint16_t, CanonicalHuffmanCodesHash>;
         static DynamicCodeTable createCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
         static ReverseDynamicCodeTable createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
     };
