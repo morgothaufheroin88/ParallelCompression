@@ -11,3 +11,4 @@
 #include "lz/LZ77.hpp"
 #include "tree/HuffmanTree.hpp"
 #include "deflate/Deflator.hpp"
+#include "deflate/Inflator.hpp"
