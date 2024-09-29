@@ -20,8 +20,9 @@ namespace deflate
         };
 
     private:
+        constexpr static std::uint16_t MAX_MATCH_LENGTH = 258;
         static constexpr std::uint16_t WINDOW_SIZE = 32 * 1024;
-        static Match findBestMatch(const std::vector<std::byte> &data, std::uint16_t position);
+        [[nodiscard]] static Match findBestMatch(const std::vector<std::byte> &data, std::uint16_t position);
 
     public:
         static std::vector<Match> compress(const std::vector<std::byte> &dataToCompress);

@@ -4,32 +4,27 @@
 
 #include "LZ77.hpp"
 
-deflate::LZ77::Match deflate::LZ77::findBestMatch(const std::vector<std::byte> &data, std::uint16_t position)
+[[nodiscard]] deflate::LZ77::Match deflate::LZ77::findBestMatch(const std::vector<std::byte> &data, const std::uint16_t position)
 {
     Match bestMatch{std::byte{0x0}, 0, 0};
 
-    auto searchLimit = std::min(WINDOW_SIZE, position);
-    auto lookaheadBuffer = _mm256_loadu_si256(std::bit_cast<__m256i *>(&data[position]));
+    const auto searchLimit = std::min(WINDOW_SIZE, position);
 
-    for (std::uint16_t i = 1; i <= searchLimit; i++)
+    for (std::uint16_t i = 1; i <= searchLimit; ++i)
     {
-        auto candidate = _mm256_loadu_si256(std::bit_cast<__m256i *>(&data[position - i]));
-        auto cmp = _mm256_cmpeq_epi8(lookaheadBuffer, candidate);
-
-        auto mask = _mm256_movemask_epi8(cmp);
-        int matchLength = 0;
-        while (mask & 1)
+        std::uint32_t matchLength = 0;
+        while (((position + matchLength) < data.size()) && (data[position - (i + matchLength)] == data[position + matchLength]) && (matchLength < MAX_MATCH_LENGTH))
         {
-            matchLength++;
-            mask >>= 1;
+            ++matchLength;
         }
 
-        if (matchLength > bestMatch.length && matchLength > 1)
+        if ((matchLength > bestMatch.length) && (matchLength > 1))
         {
             bestMatch.length = static_cast<std::uint16_t>(matchLength);
             bestMatch.distance = i;
         }
     }
+
     if (bestMatch.length == 0)
     {
         bestMatch.literal = data[position];
@@ -44,7 +39,7 @@ std::vector<deflate::LZ77::Match> deflate::LZ77::compress(const std::vector<std:
     compressedData.reserve(WINDOW_SIZE);
 
     std::uint16_t position{0};
-    auto dataSize = dataToCompress.size();
+    const auto dataSize = dataToCompress.size();
 
     while (position < dataSize)
     {
@@ -59,7 +54,7 @@ std::vector<deflate::LZ77::Match> deflate::LZ77::compress(const std::vector<std:
             match.length = 1;
             match.distance = 0;
             compressedData.push_back(match);
-            position++;
+            ++position;
         }
     }
 
@@ -79,7 +74,7 @@ std::vector<std::byte> deflate::LZ77::decompress(const std::vector<Match> &compr
         }
         else
         {
-            auto offset = decompressedData.size() - match.distance;
+            const auto offset = decompressedData.size() - match.distance;
             for (std::uint16_t i = 0; i < match.length; ++i)
             {
                 decompressedData.push_back(decompressedData[offset + i]);
