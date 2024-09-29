@@ -4,7 +4,6 @@
 
 #pragma once
 #include <cstdint>
-#include <immintrin.h>
 #include <vector>
 
 namespace deflate

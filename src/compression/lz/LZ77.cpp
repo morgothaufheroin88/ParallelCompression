@@ -13,7 +13,7 @@
     for (std::uint16_t i = 1; i <= searchLimit; ++i)
     {
         std::uint32_t matchLength = 0;
-        while (((position + matchLength) < data.size()) && (data[position - (i + matchLength)] == data[position + matchLength]) && (matchLength < MAX_MATCH_LENGTH))
+        while (((position + matchLength) < data.size()) && (data[(position - i) + matchLength] == data[position + matchLength]) && (matchLength < MAX_MATCH_LENGTH))
         {
             ++matchLength;
         }

@@ -5,7 +5,7 @@
 #include "FixedHuffmanDecoder.hpp"
 #include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
-
+#include <ranges>
 
 void deflate::FixedHuffmanDecoder::resetCode()
 {
@@ -30,7 +30,7 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
     };
 
     //find length with code
-    if (auto *lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findCode); lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
+    if (auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findCode); lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
     {
         //try read extra bits if code has extra bits
         isNextDistance = true;
@@ -63,7 +63,7 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance()
     };
 
     //find distance with code
-    if (auto *distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
+    if (auto distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
     {
         //try read extra bits if code has extra bits
         if (distanceCodeIterator->extraBitsCount > 0)
@@ -88,7 +88,7 @@ std::optional<std::byte> deflate::FixedHuffmanDecoder::tryDecodeLiteral()
     };
 
     auto FIXED_LITERALS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLiterals();
-    if (const auto *const literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
+    if (const auto literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
     {
         resetCode();
         return literalsCodesIterator->literal;

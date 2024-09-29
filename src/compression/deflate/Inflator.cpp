@@ -5,7 +5,8 @@
 #include "Inflator.hpp"
 #include "../decoders/DynamicHuffmanDecoder.hpp"
 #include "../decoders/FixedHuffmanDecoder.hpp"
-#include <cassert>
+#include "../buffer/BitBuffer.hpp"
+#include <cstddef>
 #include <cstdint>
 
 std::vector<std::byte> deflate::Inflator::getUncompressedBlock(const std::vector<std::byte> &data) const
@@ -19,7 +20,7 @@ std::vector<std::byte> deflate::Inflator::getUncompressedBlock(const std::vector
 
 std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte> &data) const
 {
-    assert(data.size() > 0);
+    assert(data.size() > 0,"The input data is empty");
     const auto header = data[0];
 
     [[maybe_unused]] const auto isLastBlock = static_cast<bool>(std::byte{((1 << 1) - 1)} & (header >> 0));
@@ -40,7 +41,7 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
     }
     else
     {
-        assert(false && "Unsupported block type");
+        assert(false , "Unsupported block type");
     }
 
     return std::vector<std::byte>{};

@@ -5,7 +5,7 @@
 #include "DynamicHuffmanDecoder.hpp"
 #include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
-
+#include <ranges>
 
 void deflate::DynamicHuffmanDecoder::decodeHeader()
 {
@@ -60,7 +60,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeLength(con
         return (element.index + 255) == lengthFixedCode;
     };
 
-    if (const auto *lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
+    if (auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
     {
         const auto fixedLengthCode = *lengthCodesIterator;
         if (lengthCodesIterator->extraBitsCount > 0)
@@ -92,7 +92,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
     if (it != distancesCodeTable.end())
     {
         fixedCode = it->second;
-        if (const auto *distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
+        if (auto distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
         {
             const auto fixedLengthCode = *distanceCodesIterator;
             if (distanceCodesIterator->extraBitsCount > 0)

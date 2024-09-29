@@ -3,6 +3,7 @@
 //
 
 #include "BitBuffer.hpp"
+#include <cstddef>
 
 deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(newBuffer)
 {

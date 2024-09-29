@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <vector>
+#include <cstddef>
 
 namespace deflate
 {

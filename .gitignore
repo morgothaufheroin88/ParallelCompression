@@ -2,5 +2,8 @@ cmake-build-release
 cmake-build-debug
 cmake-build-debug-wsl
 cmake-build-release-wsl
+cmake-build-debug-clang-cl
+cmake-build-debug-visual-studio
+out
 .idea
 .vs

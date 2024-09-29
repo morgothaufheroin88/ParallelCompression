@@ -6,7 +6,7 @@
 #include "../buffer/BitBuffer.hpp"
 #include "../tree/HuffmanTree.hpp"
 #include "../lz/LZ77.hpp"
-
+#include <ranges>
 
 namespace deflate
 {
