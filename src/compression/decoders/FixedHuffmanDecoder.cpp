@@ -4,9 +4,7 @@
 
 #include "FixedHuffmanDecoder.hpp"
 #include "../encoders/FixedHuffmanEncoder.hpp"
-
 #include <array>
-#include <cassert>
 
 
 void deflate::FixedHuffmanDecoder::resetCode()
@@ -32,7 +30,7 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
     };
 
     //find length with code
-    if (auto* lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findCode); lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
+    if (auto *lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findCode); lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
     {
         //try read extra bits if code has extra bits
         isNextDistance = true;
@@ -40,7 +38,7 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
         {
             extraBits = bitBuffer.readBits(lengthCodesIterator->extraBitsCount);
             lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByExtraBits);
-            assert(lengthCodesIterator != FIXED_LENGTHS_CODES.cend() && "Fixed length code not found!");
+            assert(lengthCodesIterator != FIXED_LENGTHS_CODES.cend(), "Fixed length code not found!");
         }
 
         resetCode();
@@ -65,14 +63,14 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance()
     };
 
     //find distance with code
-    if (auto*  distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
+    if (auto *distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
     {
         //try read extra bits if code has extra bits
         if (distanceCodeIterator->extraBitsCount > 0)
         {
             extraBits = bitBuffer.readBits(distanceCodeIterator->extraBitsCount);
             distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByExtraBits);
-            assert(distanceCodeIterator != FIXED_DISTANCES_CODES.cend() && "Fixed length code not found!");
+            assert(distanceCodeIterator != FIXED_DISTANCES_CODES.cend(), "Fixed length code not found!");
         }
 
         resetCode();
@@ -90,7 +88,7 @@ std::optional<std::byte> deflate::FixedHuffmanDecoder::tryDecodeLiteral()
     };
 
     auto FIXED_LITERALS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLiterals();
-    if (const auto* const literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
+    if (const auto *const literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
     {
         resetCode();
         return literalsCodesIterator->literal;
@@ -99,29 +97,31 @@ std::optional<std::byte> deflate::FixedHuffmanDecoder::tryDecodeLiteral()
     return std::nullopt;
 }
 
+void deflate::FixedHuffmanDecoder::decodeHeader()
+{
+    //check if it is a last block
+    [[maybe_unused]] const auto isLastBlock = bitBuffer.readBits(1);
+
+    //check block type
+    const auto blockType = bitBuffer.readBits(2);
+    assert(blockType == 1, "Wrong block type!");
+}
+
 deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const BitBuffer &newBitBuffer) : bitBuffer(newBitBuffer)
 {
+    decodeHeader();
 }
 
 std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
 {
-    bool isHeaderParsed = false;
     std::uint16_t distance{0};
     std::uint16_t length{0};
     std::vector<deflate::LZ77::Match> lz77Matches;
     while (bitBuffer.next())
     {
-
         //read one bit from byte
-        code |=  std::to_integer<std::uint16_t>(bitBuffer.readBit() << codeBitPosition);
+        code |= std::to_integer<std::uint16_t>(bitBuffer.readBit() << codeBitPosition);
         ++codeBitPosition;
-
-        //check header magic numbers
-        if ((!isHeaderParsed) && (codeBitPosition == 3) && ((code == 0b011) || (code == 0b010)))
-        {
-            isHeaderParsed = true;
-            resetCode();
-        }
 
         //check if code is literal or encoded lz77 length with code length = 8
         //code length with 8 - literals from 0 to 143 or lz77 length from 280 to 287
@@ -130,7 +130,7 @@ std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
 
         if ((codeBitPosition == 8) || (codeBitPosition == 9))
         {
-            if(auto literal = tryDecodeLiteral(); literal.has_value())
+            if (auto literal = tryDecodeLiteral(); literal.has_value())
             {
                 //adding current decoded literal
                 lz77Matches.emplace_back(literal.value(), 0, 1);

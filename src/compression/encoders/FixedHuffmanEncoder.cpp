@@ -8,6 +8,7 @@
 
 std::vector<std::byte> deflate::FixedHuffmanEncoder::encodeData(const std::vector<LZ77::Match> &dataToEncode, const bool isLastBlock)
 {
+    assert(!dataToEncode.empty(),"LZ77 matches is empty!");
     constexpr auto FIXED_LITERALS_CODES{initializeFixedCodesForLiterals()};
     constexpr auto FIXED_DISTANCES_CODES{initializeFixedCodesForDistances()};
     constexpr auto FIXED_LENGTHS_CODES{initializeFixedCodesForLengths()};

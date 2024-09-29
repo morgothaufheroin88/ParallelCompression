@@ -6,6 +6,7 @@
 
 deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(newBuffer)
 {
+    assert(!newBuffer.empty(),"Buffer is empty!");
     currentByte = newBuffer[0];
 }
 

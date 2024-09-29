@@ -5,23 +5,26 @@
 #include "DynamicHuffmanDecoder.hpp"
 #include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
-#include <cassert>
+
 
 void deflate::DynamicHuffmanDecoder::decodeHeader()
 {
     //read block type
     [[maybe_unused]] const auto isLastBlock = bitBuffer.readBit();
     const auto blockType = bitBuffer.readBits(2);
-    assert(blockType == 0b10 && "wrong block type");
+    assert(blockType == 0b10, "Wrong block type!");
 
     //read count of literals in table
     HLIT = static_cast<std::uint8_t>(bitBuffer.readBits(5));
+    assert((HLIT + 257) > 0, "HLIT less or equal zero");
 
     //read count of distances in table
     HDIST = static_cast<std::uint8_t>(bitBuffer.readBits(5));
+    assert((HDIST + 1) > 0, "HDIST less or equal zero");
 
     //read count of ccls
     HCLEN = static_cast<std::uint8_t>(bitBuffer.readBits(4));
+    assert((HCLEN + 4) > 0, "HCLEN less or equal zero");
 
     decodeCodeLengths();
 }
@@ -65,7 +68,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeLength(con
             const auto extraBits = bitBuffer.readBits(lengthCodesIterator->extraBitsCount);
             lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, [extraBits, &fixedLengthCode](const auto &element)
                                                        { return (extraBits == element.extraBits) && (fixedLengthCode.code == element.code); });
-            assert(lengthCodesIterator != FIXED_LENGTHS_CODES.cend() && "Fixed length code not found!");
+            assert(lengthCodesIterator != FIXED_LENGTHS_CODES.cend(), "Fixed length code not found!");
         }
 
         return lengthCodesIterator->length;
@@ -97,7 +100,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
                 const auto extraBits = bitBuffer.readBits(distanceCodesIterator->extraBitsCount);
                 distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, [extraBits, &fixedLengthCode](const auto &element)
                                                              { return (extraBits == element.extraBits) && (fixedLengthCode.code == element.code); });
-                assert(distanceCodesIterator != FIXED_DISTANCES_CODES.cend() && "Fixed distance code not found!");
+                assert(distanceCodesIterator != FIXED_DISTANCES_CODES.cend(), "Fixed distance code not found!");
             }
 
             return distanceCodesIterator->distance;

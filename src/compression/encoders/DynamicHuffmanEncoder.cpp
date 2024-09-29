@@ -5,7 +5,7 @@
 #include "DynamicHuffmanEncoder.hpp"
 #include "FixedHuffmanEncoder.hpp"
 #include <algorithm>
-#include <iostream>
+
 
 std::uint32_t deflate::DynamicHuffmanEncoder::reverseBits(const std::uint32_t bits, const std::uint8_t bitsCount) const
 {
@@ -77,6 +77,7 @@ void deflate::DynamicHuffmanEncoder::encodeCodeLengths(const std::vector<std::ui
 
 void deflate::DynamicHuffmanEncoder::encodeLZ77Matches(const std::vector<LZ77::Match> &lz77Matches)
 {
+    assert(!lz77Matches.empty(), "LZ77 matches is empty!");
     auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
     auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
 

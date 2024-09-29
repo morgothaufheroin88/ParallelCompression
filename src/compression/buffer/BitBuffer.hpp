@@ -4,10 +4,25 @@
 
 #pragma once
 #include <cstdint>
+#include <iostream>
+#include <source_location>
+#include <string_view>
 #include <vector>
 
 namespace deflate
 {
+    static inline void assert(const bool condition, const std::string_view &message)
+    {
+        if (!condition)
+        {
+            const std::source_location location = std::source_location::current();
+
+            std::cerr << "Assertion failed: " << message << " at " << location.file_name() << '('
+                      << location.line() << ':'
+                      << location.column() << ") `"
+                      << location.function_name() << "\n";
+        }
+    }
     class BitBuffer
     {
     private:
