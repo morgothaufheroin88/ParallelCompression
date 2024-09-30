@@ -146,7 +146,7 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
     literalsAndLengths.push_back(256);
 
     const HuffmanTree literalsAndLengthsTree(literalsAndLengths, FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
-    const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
+    const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::MAX_DISTANCE);
 
     literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
     distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
