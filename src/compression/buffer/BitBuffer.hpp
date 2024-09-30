@@ -11,16 +11,15 @@
 
 namespace deflate
 {
-    static inline void assert(const bool condition, const std::string_view &message)
+    static inline void assert(const bool condition, const std::string_view &message, const std::source_location &location = std::source_location::current())
     {
         if (!condition)
         {
-            const std::source_location location = std::source_location::current();
-
             std::cerr << "Assertion failed: " << message << " at " << location.file_name() << '('
                       << location.line() << ':'
                       << location.column() << ") `"
                       << location.function_name() << "\n";
+            std::exit(-1);
         }
     }
     class BitBuffer
