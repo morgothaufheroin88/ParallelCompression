@@ -20,7 +20,7 @@ namespace deflate
         static constexpr std::uint16_t MAX_DISTANCE = 32'768;
         static constexpr std::int16_t MAX_LITERAL = 256;
         static constexpr std::uint16_t DISTANCES_ALPHABET_SIZE = 30;
-        static constexpr std::uint16_t LITERALS_AND_DISTANCES_ALPHABET_SIZE = 285;
+        static constexpr std::uint16_t LITERALS_AND_LENGTHS_ALPHABET_SIZE = 285;
 
     private:
         struct LiteralCode

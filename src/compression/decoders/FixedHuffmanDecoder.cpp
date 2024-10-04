@@ -25,9 +25,9 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
         return (arrayCode.code == code) && (arrayCode.codeLength == codeBitPosition);
     };
 
-    auto findByExtraBits = [this](const auto &distanceCode)
+    auto findByExtraBits = [this](const auto &lengthCode)
     {
-        return (extraBits == distanceCode.extraBits) && (code == distanceCode.code) && (codeBitPosition == distanceCode.codeLength);
+        return (extraBits == lengthCode.extraBits) && (code == lengthCode.code) && (codeBitPosition == lengthCode.codeLength);
     };
 
     //find length with code
