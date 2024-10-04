@@ -5,6 +5,7 @@
 #include "FixedHuffmanDecoder.hpp"
 #include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
+#include <bitset>
 #include <ranges>
 
 void deflate::FixedHuffmanDecoder::resetCode()
@@ -21,12 +22,12 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
 
     auto findCode = [this](const auto &arrayCode)
     {
-        return arrayCode.code == code;
+        return (arrayCode.code == code) && (arrayCode.codeLength == codeBitPosition);
     };
 
     auto findByExtraBits = [this](const auto &distanceCode)
     {
-        return (extraBits == distanceCode.extraBits) && (code == distanceCode.code);
+        return (extraBits == distanceCode.extraBits) && (code == distanceCode.code) && (codeBitPosition == distanceCode.codeLength);
     };
 
     //find length with code
@@ -134,6 +135,10 @@ std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
             {
                 //adding current decoded literal
                 lz77Matches.emplace_back(literal.value(), 0, 1);
+            }
+            else if (codeBitPosition == 8)
+            {
+                length = tryDecodeLength().value_or(0);
             }
 
             if (codeBitPosition == 9)
