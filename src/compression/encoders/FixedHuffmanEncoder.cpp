@@ -2,18 +2,16 @@
 // Created by cx9ps3 on 18.08.2024.
 //
 
-#include "../buffer/BitBuffer.hpp"
 #include "FixedHuffmanEncoder.hpp"
+#include "../buffer/BitBuffer.hpp"
 #include <cstddef>
 
 std::vector<std::byte> deflate::FixedHuffmanEncoder::encodeData(const std::vector<LZ77::Match> &dataToEncode, const bool isLastBlock)
 {
-    assert(!dataToEncode.empty(),"LZ77 matches is empty!");
+    assert(!dataToEncode.empty(), "LZ77 matches is empty!");
     constexpr auto FIXED_LITERALS_CODES{initializeFixedCodesForLiterals()};
     constexpr auto FIXED_DISTANCES_CODES{initializeFixedCodesForDistances()};
     constexpr auto FIXED_LENGTHS_CODES{initializeFixedCodesForLengths()};
-    std::vector<std::byte> compressedData;
-    compressedData.reserve(dataToEncode.size());
     BitBuffer bitBuffer;
 
     //write header
@@ -23,7 +21,7 @@ std::vector<std::byte> deflate::FixedHuffmanEncoder::encodeData(const std::vecto
     }
     else
     {
-        bitBuffer.writeBits(1, 0);
+        bitBuffer.writeBits(0, 1);
     }
 
     bitBuffer.writeBits(0b01, 2);
