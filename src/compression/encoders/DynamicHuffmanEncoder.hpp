@@ -4,8 +4,8 @@
 
 #pragma once
 #include "../buffer/BitBuffer.hpp"
-#include "../tree/HuffmanTree.hpp"
 #include "../lz/LZ77.hpp"
+#include "../tree/HuffmanTree.hpp"
 #include <ranges>
 
 namespace deflate
@@ -74,6 +74,8 @@ namespace deflate
         BitBuffer bitBuffer;
         std::vector<std::uint8_t> literalsCodeLengths;
         std::vector<std::uint8_t> distancesCodeLengths;
+
+        constexpr static std::uint16_t LITERALS_AND_LENGTHS_ALPHABET_SIZE = 287;
 
     public:
         std::vector<std::byte> encodeData(const std::vector<LZ77::Match> &lz77Matches, bool isLastBlock);

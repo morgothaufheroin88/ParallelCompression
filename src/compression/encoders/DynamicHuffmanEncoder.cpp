@@ -81,7 +81,7 @@ void deflate::DynamicHuffmanEncoder::encodeLZ77Matches(const std::vector<LZ77::M
     auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
     auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
 
-    auto literalsCodeTable = CodeTable::createCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
+    auto literalsCodeTable = CodeTable::createCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
     auto distancesCodeTable = CodeTable::createCodeTable(distancesCodeLengths, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
     for (const auto &match: lz77Matches)
@@ -91,7 +91,7 @@ void deflate::DynamicHuffmanEncoder::encodeLZ77Matches(const std::vector<LZ77::M
             const auto &lengthFixedCode = FIXED_LENGTHS_CODES[match.length];
             const auto &distanceFixedCode = FIXED_DISTANCES_CODES[match.distance];
 
-            const auto &lengthCode = literalsCodeTable[lengthFixedCode.index + 255];
+            const auto &lengthCode = literalsCodeTable[lengthFixedCode.index + 257];
             const auto &distanceCode = distancesCodeTable[distanceFixedCode.index + 1];
 
             //encode length with extra bits if exists
@@ -135,7 +135,7 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
             const auto &lengthCode = FIXED_LENGTHS_CODES[match.length];
             const auto &distanceCode = FIXED_DISTANCES_CODES[match.distance];
 
-            literalsAndLengths.push_back(lengthCode.index + 255);
+            literalsAndLengths.push_back(lengthCode.index + 257);
             distances.push_back(distanceCode.index + 1);
         }
         else
@@ -145,10 +145,10 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
     }
     literalsAndLengths.push_back(256);
 
-    const HuffmanTree literalsAndLengthsTree(literalsAndLengths, FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
-    const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::MAX_DISTANCE);
+    const HuffmanTree literalsAndLengthsTree(literalsAndLengths, LITERALS_AND_LENGTHS_ALPHABET_SIZE + 1);
+    const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::MAX_DISTANCE + 1);
 
-    literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
+    literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(LITERALS_AND_LENGTHS_ALPHABET_SIZE + 1);
     distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
     //write header
@@ -158,7 +158,8 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
     }
     else
     {
-        bitBuffer.writeBits(1, 0);
+
+        bitBuffer.writeBits(0, 1);
     }
 
     bitBuffer.writeBits(0b10, 2);

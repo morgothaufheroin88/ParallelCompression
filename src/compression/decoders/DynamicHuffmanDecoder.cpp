@@ -57,7 +57,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeLength(con
     constexpr auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
     const auto findByIndex = [&lengthFixedCode](const auto &element)
     {
-        return (element.index + 255) == lengthFixedCode;
+        return (element.index + 257) == lengthFixedCode;
     };
 
     if (auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
@@ -189,7 +189,7 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
     const auto findCodeInCodeTable = [&reversedCode, &codeBitPosition](const auto &pair)
     { return (pair.first.code == reversedCode) && (pair.first.length == codeBitPosition); };
 
-    literalsCodeTable = CodeTable::createReverseCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_DISTANCES_ALPHABET_SIZE);
+    literalsCodeTable = CodeTable::createReverseCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
     distancesCodeTable = CodeTable::createReverseCodeTable(distanceCodeLengths, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
     const auto resetCode = [&code, &codeBitPosition]()
