@@ -7,7 +7,7 @@
 
 deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(newBuffer)
 {
-    assert(!newBuffer.empty(),"Buffer is empty!");
+    assert(!newBuffer.empty(), "Buffer is empty!");
     currentByte = newBuffer[0];
 }
 
@@ -22,6 +22,7 @@ std::byte deflate::BitBuffer::readBit()
     ++bitPosition;
     if (bitPosition == 8)
     {
+        assert(byteIndex < buffer.size(), "byteIndex < buffer.size()");
         ++byteIndex;
         bitPosition = 0;
         currentByte = buffer[byteIndex];

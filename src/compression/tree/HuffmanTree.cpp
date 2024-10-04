@@ -3,9 +3,13 @@
 //
 
 #include "HuffmanTree.hpp"
+
+#include "../buffer/BitBuffer.hpp"
+
 #include <algorithm>
 #include <array>
 #include <bitset>
+#include <format>
 #include <iostream>
 #include <stack>
 
@@ -14,10 +18,7 @@ std::vector<std::uint32_t> deflate::HuffmanTree::countFrequencies(const std::vec
     std::vector<std::uint32_t> frequencies(static_cast<std::vector<std::uint32_t>::value_type>(alphabetSize), 0);
     for (const auto symbol: symbols)
     {
-        if(symbol >= alphabetSize)
-        {
-            std::cout<<symbol<<"\n";
-        }
+        assert(symbol < static_cast<std::uint16_t>(frequencies.size()), std::format("symbol {} out of range {}", symbol, frequencies.size()));
         ++frequencies[static_cast<uint16_t>(symbol)];
     }
 
