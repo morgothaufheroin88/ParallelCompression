@@ -49,14 +49,25 @@ namespace deflate
                         }
                     }
                 }
-                else if ((it != std::begin(std::forward<T>(range))) && (current == *(it - 1)) && (current == *(it + 1)) && (current == *(it + 2)))
+                else if (it != std::begin(std::forward<T>(range)) && current == *(it - 1) && current == *(it + 1) && current == *(it + 2))
                 {
                     it = std::ranges::find_if(it + 3, end, [=](const std::uint32_t v)
                                               { return v != current; });
                     auto repeat = std::distance(oldIt, it);
-                    extraBits = repeat - 3;
-                    extraBitsLength = 2;
-                    return 16;
+
+                    if (repeat > 6)
+                    {
+                        extraBits = 3;
+                        extraBitsLength = 2;
+                        it = oldIt + 6;
+                        return 16;
+                    }
+                    else
+                    {
+                        extraBits = repeat - 3;
+                        extraBitsLength = 2;
+                        return 16;
+                    }
                 }
             }
 
