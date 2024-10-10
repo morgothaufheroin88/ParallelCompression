@@ -18,7 +18,7 @@
             ++matchLength;
         }
 
-        if ((matchLength > bestMatch.length) && (matchLength > 1))
+        if ((matchLength > bestMatch.length) && (matchLength > 2))
         {
             bestMatch.length = static_cast<std::uint16_t>(matchLength);
             bestMatch.distance = i;
