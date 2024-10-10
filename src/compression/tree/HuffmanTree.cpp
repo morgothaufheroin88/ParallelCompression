@@ -139,11 +139,11 @@ deflate::HuffmanTree::HuffmanTree(const std::vector<std::int16_t> &symbols, cons
     std::ranges::sort(treeNodes, NodeSortCompare());
 }
 
-deflate::CodeTable::DynamicCodeTable deflate::CodeTable::createCodeTable(const std::vector<std::uint8_t> &codeLengths, const std::uint16_t codeTableSize)
+deflate::CodeTable::HuffmanCodeTable deflate::CodeTable::createCodeTable(const std::vector<std::uint8_t> &codeLengths, const std::uint16_t codeTableSize)
 {
     if (codeLengths.size() == 1)
     {
-        DynamicCodeTable codeTable;
+        HuffmanCodeTable codeTable;
         CanonicalHuffmanCode code;
         code.code = 1;
         code.length = 1;
@@ -151,7 +151,7 @@ deflate::CodeTable::DynamicCodeTable deflate::CodeTable::createCodeTable(const s
         return codeTable;
     }
 
-    DynamicCodeTable codeTable(codeTableSize);
+    HuffmanCodeTable codeTable(codeTableSize);
     codeTable.reserve(codeLengths.size());
 
     std::array<std::uint16_t, MAX_BITS + 1> codeLengthsCount = {0};
@@ -188,10 +188,10 @@ deflate::CodeTable::DynamicCodeTable deflate::CodeTable::createCodeTable(const s
     return codeTable;
 }
 
-deflate::CodeTable::ReverseDynamicCodeTable deflate::CodeTable::createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, const std::uint16_t codeTableSize)
+deflate::CodeTable::ReverseHuffmanCodeTable deflate::CodeTable::createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, const std::uint16_t codeTableSize)
 {
     auto codeTable = createCodeTable(codeLengths, codeTableSize);
-    ReverseDynamicCodeTable reverseCodeTable(codeLengths.size());
+    ReverseHuffmanCodeTable reverseCodeTable(codeLengths.size());
 
     for (auto &[symbol, code]: codeTable)
     {

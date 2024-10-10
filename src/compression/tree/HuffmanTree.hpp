@@ -61,7 +61,7 @@ namespace deflate
 
     class CodeTable
     {
-    private:
+    public:
         struct CanonicalHuffmanCode
         {
             std::uint16_t code{0};
@@ -69,6 +69,7 @@ namespace deflate
             bool operator==(const CanonicalHuffmanCode &other) const = default;
         };
 
+    private:
         class CanonicalHuffmanCodesHash
         {
         public:
@@ -77,13 +78,12 @@ namespace deflate
                 return std::hash<std::uint32_t>()(code.code + code.length);
             }
         };
-
         static constexpr std::uint8_t MAX_BITS = 15;
 
     public:
-        using DynamicCodeTable = std::unordered_map<std::uint16_t, CanonicalHuffmanCode>;
-        using ReverseDynamicCodeTable = std::unordered_map<CanonicalHuffmanCode, std::uint16_t, CanonicalHuffmanCodesHash>;
-        static DynamicCodeTable createCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
-        static ReverseDynamicCodeTable createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
+        using HuffmanCodeTable = std::unordered_map<std::uint16_t, CanonicalHuffmanCode>;
+        using ReverseHuffmanCodeTable = std::unordered_map<CanonicalHuffmanCode, std::uint16_t, CanonicalHuffmanCodesHash>;
+        static HuffmanCodeTable createCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
+        static ReverseHuffmanCodeTable createReverseCodeTable(const std::vector<std::uint8_t> &codeLengths, std::uint16_t codeTableSize);
     };
 }// namespace deflate
