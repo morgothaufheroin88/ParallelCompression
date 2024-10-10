@@ -22,10 +22,12 @@ std::byte deflate::BitBuffer::readBit()
     ++bitPosition;
     if (bitPosition == 8)
     {
-        assert(byteIndex < buffer.size(), "byteIndex < buffer.size()");
         ++byteIndex;
-        bitPosition = 0;
-        currentByte = buffer[byteIndex];
+        if (byteIndex < buffer.size())
+        {
+            bitPosition = 0;
+            currentByte = buffer[byteIndex];
+        }
     }
     return bit;
 }
@@ -35,7 +37,8 @@ std::uint32_t deflate::BitBuffer::readBits(const std::size_t numberOfBits)
     std::uint32_t result = 0;
     for (std::size_t i = 0; i < numberOfBits; ++i)
     {
-        result |= static_cast<std::uint32_t>(readBit() << i);
+        const auto bit = readBit();
+        result |= static_cast<std::uint32_t>(bit) << i;
     }
     return result;
 }
