@@ -57,27 +57,24 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeLength(con
     constexpr auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
     const auto findByIndex = [&lengthFixedCode](const auto &element)
     {
-        return (element.index + 257) == lengthFixedCode;
+        return ((element.index + 257) == lengthFixedCode) && (element.code != 0) && (element.codeLength != 0);
     };
 
-    if (auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
+    if (const auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
     {
-        const auto fixedLengthCode = *lengthCodesIterator;
+        std::uint16_t extraBits = 0;
         if (lengthCodesIterator->extraBitsCount > 0)
         {
-            const auto extraBits = bitBuffer.readBits(lengthCodesIterator->extraBitsCount);
-            lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, [extraBits, &fixedLengthCode](const auto &element)
-                                                       { return (extraBits == element.extraBits) && (fixedLengthCode.code == element.code); });
-            assert(lengthCodesIterator != FIXED_LENGTHS_CODES.cend(), "Fixed length code not found!");
+            extraBits = static_cast<std::uint16_t>(bitBuffer.readBits(lengthCodesIterator->extraBitsCount));
         }
 
-        return lengthCodesIterator->length;
+        return lengthCodesIterator->length + extraBits;
     }
 
     return std::nullopt;
 }
 
-std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(const std::uint16_t code, const std::uint8_t codeBitPosition)
+std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(const std::uint32_t code, const std::uint8_t codeBitPosition)
 {
     const auto it = std::ranges::find_if(distancesCodeTable, [code, codeBitPosition](const auto &pair)
                                          { return (pair.first.code == code) && (pair.first.length == codeBitPosition); });
@@ -86,7 +83,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
     constexpr auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
     const auto findByIndex = [&fixedCode](const auto &element)
     {
-        return (element.index + 1) == fixedCode;
+        return ((element.index + 1) == fixedCode) && (element.distance != 0);
     };
 
     if (it != distancesCodeTable.end())
@@ -94,16 +91,13 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
         fixedCode = it->second;
         if (auto distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
         {
-            const auto fixedLengthCode = *distanceCodesIterator;
+            std::uint16_t extraBits = 0;
             if (distanceCodesIterator->extraBitsCount > 0)
             {
-                const auto extraBits = bitBuffer.readBits(distanceCodesIterator->extraBitsCount);
-                distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, [extraBits, &fixedLengthCode](const auto &element)
-                                                             { return (extraBits == element.extraBits) && (fixedLengthCode.code == element.code); });
-                assert(distanceCodesIterator != FIXED_DISTANCES_CODES.cend(), "Fixed distance code not found!");
+                extraBits = static_cast<std::uint16_t>(bitBuffer.readBits(distanceCodesIterator->extraBitsCount));
             }
 
-            return distanceCodesIterator->distance;
+            return distanceCodesIterator->distance + extraBits;
         }
     }
 
@@ -119,6 +113,7 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
     std::uint16_t code{0};
     std::uint8_t codeBitPosition{0};
     std::uint16_t previousLength{0};
+    std::uint16_t previousCode{0};
 
     auto repeatNumbers = [&i, this](const std::uint32_t repeat, const std::uint8_t number)
     {
@@ -159,7 +154,13 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
                 const auto repeat = bitBuffer.readBits(3);
                 repeatNumbers(repeat + 3, 0);
             }
-            else if ((previousLength < 16) && (previousLength > 0) && (it->second == 16))
+            else if ((previousCode < 16) && (previousCode > 0) && (it->second == 16))
+            {
+                previousLength = previousCode;
+                const auto repeat = bitBuffer.readBits(2);
+                repeatNumbers(repeat + 3, static_cast<std::uint8_t>(previousLength));
+            }
+            else if ((previousCode == 16) && (it->second == 16))
             {
                 const auto repeat = bitBuffer.readBits(2);
                 repeatNumbers(repeat + 3, static_cast<std::uint8_t>(previousLength));
@@ -169,7 +170,7 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
                 repeatNumbers(1, static_cast<std::uint8_t>(it->second));
             }
 
-            previousLength = it->second;
+            previousCode = it->second;
             code = 0;
             codeBitPosition = 0;
         }
@@ -192,8 +193,10 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
     literalsCodeTable = CodeTable::createReverseCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
     distancesCodeTable = CodeTable::createReverseCodeTable(distanceCodeLengths, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
-    const auto resetCode = [&code, &codeBitPosition]()
+
+    const auto resetCode = [&code, &reversedCode, &codeBitPosition]()
     {
+        reversedCode = 0;
         code = 0;
         codeBitPosition = 0;
     };
@@ -227,7 +230,7 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
 
         if (length > 0)
         {
-            if (auto distanceOptional = tryDecodeDistance(code, codeBitPosition); distanceOptional.has_value())
+            if (auto distanceOptional = tryDecodeDistance(reversedCode, codeBitPosition); distanceOptional.has_value())
             {
                 distance = distanceOptional.value();
                 resetCode();
