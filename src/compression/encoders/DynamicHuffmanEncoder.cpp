@@ -146,10 +146,10 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
     literalsAndLengths.push_back(256);
 
     const HuffmanTree literalsAndLengthsTree(literalsAndLengths, LITERALS_AND_LENGTHS_ALPHABET_SIZE + 1);
-    const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::MAX_DISTANCE + 1);
+    const HuffmanTree distancesTree(distances, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE + 1);
 
     literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(LITERALS_AND_LENGTHS_ALPHABET_SIZE + 1);
-    distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
+    distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE + 1);
 
     //write header
     if (isLastBlock)
