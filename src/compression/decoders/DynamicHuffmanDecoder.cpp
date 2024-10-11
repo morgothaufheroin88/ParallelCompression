@@ -3,7 +3,6 @@
 //
 
 #include "DynamicHuffmanDecoder.hpp"
-#include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
 #include <ranges>
 
@@ -54,7 +53,6 @@ std::uint32_t deflate::DynamicHuffmanDecoder::reverseBits(const std::uint32_t bi
 
 std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeLength(const std::uint16_t lengthFixedCode)
 {
-    constexpr auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
     const auto findByIndex = [&lengthFixedCode](const auto &element)
     {
         return ((element.index + 257) == lengthFixedCode) && (element.code != 0) && (element.codeLength != 0);
@@ -80,7 +78,6 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
                                          { return (pair.first.code == code) && (pair.first.length == codeBitPosition); });
 
     std::uint16_t fixedCode = 0;
-    constexpr auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
     const auto findByIndex = [&fixedCode](const auto &element)
     {
         return ((element.index + 1) == fixedCode) && (element.distance != 0);
@@ -89,7 +86,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
     if (it != distancesCodeTable.end())
     {
         fixedCode = it->second;
-        if (auto distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
+        if (const auto distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
         {
             std::uint16_t extraBits = 0;
             if (distanceCodesIterator->extraBitsCount > 0)
@@ -134,7 +131,8 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
     while (i < codeLengthsCount)
     {
         //read one bit from byte
-        code |= std::to_integer<std::uint16_t>(bitBuffer.readBit() << codeBitPosition);
+        const auto bit = bitBuffer.readBit();
+        code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
         ++codeBitPosition;
 
         const auto reversedBits = reverseBits(code, codeBitPosition);
@@ -204,7 +202,8 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
     while ((bitBuffer.next()) && (!isEndOfBlock))
     {
         //read one bit from byte
-        code |= std::to_integer<std::uint16_t>(bitBuffer.readBit() << codeBitPosition);
+        const auto bit = bitBuffer.readBit();
+        code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
         ++codeBitPosition;
 
         reversedCode = reverseBits(code, codeBitPosition);
