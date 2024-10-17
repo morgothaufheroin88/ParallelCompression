@@ -18,7 +18,7 @@ std::byte deflate::BitBuffer::readBit()
         return std::byte{0};
     }
 
-    const auto bit = std::byte{static_cast<std::uint8_t>(static_cast<std::uint16_t>(currentByte) >> bitPosition & 1)};
+    const auto bit = std::byte{static_cast<std::uint8_t>((static_cast<std::uint16_t>(currentByte) >> bitPosition) & 1)};
     ++bitPosition;
     if (bitPosition == 8)
     {
@@ -48,7 +48,8 @@ void deflate::BitBuffer::writeBits(std::uint32_t value, std::size_t numberOfBits
     while (numberOfBits > 0)
     {
         const auto bitsToWrite = std::min(numberOfBits, static_cast<std::size_t>(8 - bitPosition));
-        const auto bits = static_cast<std::byte>((value & ((1 << bitsToWrite) - 1)) << bitPosition);
+        const auto extractedBits = value & ((1 << bitsToWrite) - 1);
+        const auto bits = static_cast<std::byte>(extractedBits << bitPosition);
         currentByte |= bits;
 
         bitPosition += bitsToWrite;
