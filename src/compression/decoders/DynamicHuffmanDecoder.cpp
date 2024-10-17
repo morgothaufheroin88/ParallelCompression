@@ -80,7 +80,7 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
     std::uint16_t fixedCode = 0;
     const auto findByIndex = [&fixedCode](const auto &element)
     {
-        return ((element.index + 1) == fixedCode) && (element.distance != 0);
+        return ((element.index) == fixedCode) && (element.distance != 0);
     };
 
     if (it != distancesCodeTable.end())
@@ -209,7 +209,7 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
         reversedCode = reverseBits(code, codeBitPosition);
 
         //check if code exists in  code table for literals and distances
-        if (const auto literalsCodeTableIterator = std::ranges::find_if(literalsCodeTable, findCodeInCodeTable); literalsCodeTableIterator != literalsCodeTable.end())
+        if (const auto literalsCodeTableIterator = std::ranges::find_if(literalsCodeTable, findCodeInCodeTable); (literalsCodeTableIterator != literalsCodeTable.end()) && (!isNextDistance))
         {
             if (literalsCodeTableIterator->second < 256)
             {
@@ -223,15 +223,17 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
             else if (auto lengthOptional = tryDecodeLength(literalsCodeTableIterator->second); lengthOptional.has_value())
             {
                 length = lengthOptional.value();
+                isNextDistance = true;
                 resetCode();
             }
         }
 
-        if (length > 0)
+        if (isNextDistance)
         {
             if (auto distanceOptional = tryDecodeDistance(reversedCode, codeBitPosition); distanceOptional.has_value())
             {
                 distance = distanceOptional.value();
+                isNextDistance = false;
                 resetCode();
             }
         }

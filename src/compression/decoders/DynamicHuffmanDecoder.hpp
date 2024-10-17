@@ -32,6 +32,7 @@ namespace deflate
         std::uint8_t HLIT{0};
         std::uint8_t HDIST{0};
         std::uint8_t HCLEN{0};
+        bool isNextDistance = false;
         CodeTable::ReverseHuffmanCodeTable literalsCodeTable;
         CodeTable::ReverseHuffmanCodeTable distancesCodeTable;
 
