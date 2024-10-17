@@ -92,7 +92,7 @@ void deflate::DynamicHuffmanEncoder::encodeLZ77Matches(const std::vector<LZ77::M
             const auto &distanceFixedCode = FIXED_DISTANCES_CODES[match.distance];
 
             const auto &lengthCode = literalsCodeTable[lengthFixedCode.index + 257];
-            const auto &distanceCode = distancesCodeTable[distanceFixedCode.index + 1];
+            const auto &distanceCode = distancesCodeTable[distanceFixedCode.index];
 
             //encode length with extra bits if exists
             bitBuffer.writeBits(reverseBits(lengthCode.code, lengthCode.length), lengthCode.length);
@@ -136,7 +136,7 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
             const auto &distanceCode = FIXED_DISTANCES_CODES[match.distance];
 
             literalsAndLengths.push_back(lengthCode.index + 257);
-            distances.push_back(distanceCode.index + 1);
+            distances.push_back(distanceCode.index);
         }
         else
         {
