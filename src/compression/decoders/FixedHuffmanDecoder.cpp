@@ -3,96 +3,54 @@
 //
 
 #include "FixedHuffmanDecoder.hpp"
-#include "../encoders/FixedHuffmanEncoder.hpp"
 #include <array>
-#include <bitset>
 #include <ranges>
 
-void deflate::FixedHuffmanDecoder::resetCode()
+std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength(const std::uint16_t lengthFixedCode)
 {
-    //reset for new code
-    code = 0;
-    codeBitPosition = 0;
-    extraBits = 0;
-}
-
-std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength()
-{
-    auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
-
-    auto findCode = [this](const auto &arrayCode)
+    const auto findByIndex = [&lengthFixedCode](const auto &element)
     {
-        return (arrayCode.code == code) && (arrayCode.codeLength == codeBitPosition);
+        return ((element.index + 257) == lengthFixedCode) && (element.code != 0) && (element.codeLength != 0);
     };
 
-    auto findByExtraBits = [this](const auto &lengthCode)
+    if (const auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
     {
-        return (extraBits == lengthCode.extraBits) && (code == lengthCode.code) && (codeBitPosition == lengthCode.codeLength);
-    };
-
-    //find length with code
-    if (auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findCode); lengthCodesIterator != FIXED_LENGTHS_CODES.cend())
-    {
-        //try read extra bits if code has extra bits
-        isNextDistance = true;
+        std::uint32_t extraBits = 0;
         if (lengthCodesIterator->extraBitsCount > 0)
         {
             extraBits = bitBuffer.readBits(lengthCodesIterator->extraBitsCount);
-            lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByExtraBits);
-            assert(lengthCodesIterator != FIXED_LENGTHS_CODES.cend(), "Fixed length code not found!");
         }
 
-        resetCode();
-        return lengthCodesIterator->length;
+        return lengthCodesIterator->length + extraBits;
     }
 
     return std::nullopt;
 }
 
-std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance()
+std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance(const std::uint16_t code, const std::uint8_t codeBitPosition)
 {
-    auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
+    const auto it = std::ranges::find_if(distancesCodeTable, [&code, &codeBitPosition](const auto &pair)
+                                         { return (pair.first.code == code) && (pair.first.length == codeBitPosition); });
 
-    auto findCode = [this](const auto &arrayCode)
+    std::uint16_t fixedCode = 0;
+    const auto findByIndex = [&fixedCode](const auto &element)
     {
-        return arrayCode.code == code;
+        return (element.index == fixedCode) && (element.distance != 0);
     };
 
-    auto findByExtraBits = [this](const auto &distanceCode)
+    if (it != distancesCodeTable.end())
     {
-        return (extraBits == distanceCode.extraBits) && (code == distanceCode.code);
-    };
-
-    //find distance with code
-    if (auto distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findCode); distanceCodeIterator != FIXED_DISTANCES_CODES.cend())
-    {
-        //try read extra bits if code has extra bits
-        if (distanceCodeIterator->extraBitsCount > 0)
+        fixedCode = it->second;
+        if (const auto distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
         {
-            extraBits = bitBuffer.readBits(distanceCodeIterator->extraBitsCount);
-            distanceCodeIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByExtraBits);
-            assert(distanceCodeIterator != FIXED_DISTANCES_CODES.cend(), "Fixed length code not found!");
+            std::uint32_t extraBits = 0;
+            if (distanceCodesIterator->extraBitsCount > 0)
+            {
+                extraBits = bitBuffer.readBits(distanceCodesIterator->extraBitsCount);
+            }
+
+            return distanceCodesIterator->distance + extraBits;
         }
-
-        resetCode();
-        return distanceCodeIterator->distance;
-    }
-
-    return std::nullopt;
-}
-
-std::optional<std::byte> deflate::FixedHuffmanDecoder::tryDecodeLiteral()
-{
-    auto findCode = [this](const auto &arrayCode)
-    {
-        return arrayCode.code == code;
-    };
-
-    auto FIXED_LITERALS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLiterals();
-    if (const auto literalsCodesIterator = std::ranges::find_if(FIXED_LITERALS_CODES, findCode); literalsCodesIterator != FIXED_LITERALS_CODES.cend())
-    {
-        resetCode();
-        return literalsCodesIterator->literal;
     }
 
     return std::nullopt;
@@ -110,6 +68,46 @@ void deflate::FixedHuffmanDecoder::decodeHeader()
 
 deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const BitBuffer &newBitBuffer) : bitBuffer(newBitBuffer)
 {
+
+    for (const auto &fixedCode: FIXED_LITERALS_CODES)
+    {
+        CodeTable::CanonicalHuffmanCode huffmanCode;
+        huffmanCode.code = fixedCode.code;
+        huffmanCode.length = fixedCode.codeLength;
+        literalsCodeTable[huffmanCode] = std::to_integer<std::uint16_t>(fixedCode.literal);
+    }
+
+    //add end of block code in table
+    CodeTable::CanonicalHuffmanCode endBlockCode;
+    endBlockCode.code = FIXED_LITERALS_CODES[256].code;
+    endBlockCode.length = FIXED_LITERALS_CODES[256].codeLength;
+    literalsCodeTable[endBlockCode] = 256;
+
+    for (const auto &fixedCode: FIXED_LENGTHS_CODES)
+    {
+        CodeTable::CanonicalHuffmanCode huffmanCode;
+        huffmanCode.code = fixedCode.code;
+        huffmanCode.length = fixedCode.codeLength;
+
+        if ((!literalsCodeTable.contains(huffmanCode)) && (huffmanCode.code > 0))
+        {
+
+            literalsCodeTable[huffmanCode] = fixedCode.index + 257;
+        }
+    }
+
+    for (const auto &fixedCode: FIXED_DISTANCES_CODES)
+    {
+        CodeTable::CanonicalHuffmanCode huffmanCode;
+        huffmanCode.code = fixedCode.code;
+        huffmanCode.length = 5;
+        if (!distancesCodeTable.contains(huffmanCode))
+        {
+            distancesCodeTable[huffmanCode] = fixedCode.index;
+        }
+    }
+
+
     decodeHeader();
 }
 
@@ -117,51 +115,58 @@ std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
 {
     std::uint16_t distance{0};
     std::uint16_t length{0};
+    std::uint16_t code{0};
+    std::uint8_t codeBitPosition{0};
     std::vector<deflate::LZ77::Match> lz77Matches;
-    while (bitBuffer.next())
+    bool isEndOfBlock{false};
+
+    const auto findCodeInCodeTable = [&code, &codeBitPosition](const auto &pair)
+    { return (pair.first.code == code) && (pair.first.length == codeBitPosition); ; };
+
+    const auto resetCode = [&code, &codeBitPosition]()
+    {
+        code = 0;
+        codeBitPosition = 0;
+    };
+
+    while ((bitBuffer.next()) && (!isEndOfBlock))
     {
         //read one bit from byte
-        code |= std::to_integer<std::uint16_t>(bitBuffer.readBit() << codeBitPosition);
+        const auto bit = bitBuffer.readBit();
+        code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
         ++codeBitPosition;
 
-        //check if code is literal or encoded lz77 length with code length = 8
-        //code length with 8 - literals from 0 to 143 or lz77 length from 280 to 287
-        //code length with 9 - literals from 144 to 255
-        //see - https://datatracker.ietf.org/doc/html/rfc1951#page-12 for details
-
-        if ((codeBitPosition == 8) || (codeBitPosition == 9))
+        //check if code exists in  code table for literals and distances
+        if (const auto literalsCodeTableIterator = std::ranges::find_if(literalsCodeTable, findCodeInCodeTable); (literalsCodeTableIterator != literalsCodeTable.end()) && (!isNextDistance))
         {
-            if (auto literal = tryDecodeLiteral(); literal.has_value())
+            if (literalsCodeTableIterator->second < 256)
             {
-                //adding current decoded literal
-                lz77Matches.emplace_back(literal.value(), 0, 1);
+                lz77Matches.emplace_back(std::byte{static_cast<std::uint8_t>(literalsCodeTableIterator->second)}, 0, 1);
+                resetCode();
             }
-            else if (codeBitPosition == 8)
+            else if (literalsCodeTableIterator->second == 256)
             {
-                length = tryDecodeLength().value_or(0);
+                isEndOfBlock = true;
             }
-
-            if (codeBitPosition == 9)
+            else if (auto lengthOptional = tryDecodeLength(literalsCodeTableIterator->second); lengthOptional.has_value())
             {
+                length = lengthOptional.value();
+                isNextDistance = true;
                 resetCode();
             }
         }
-        //check if code is  lz77 length with code length = 7
-        //see - https://datatracker.ietf.org/doc/html/rfc1951#page-12 for details
-        else if (codeBitPosition == 7)
+
+        if (isNextDistance)
         {
-            length = tryDecodeLength().value_or(0);
-        }
-        //check if code is  lz77 distance with code length = 5
-        //see - https://datatracker.ietf.org/doc/html/rfc1951#page-12 for details
-        else if ((codeBitPosition == 5) && isNextDistance)
-        {
-            isNextDistance = false;
-            distance = tryDecodeDistance().value_or(0);
+            if (auto distanceOptional = tryDecodeDistance(code, codeBitPosition); distanceOptional.has_value())
+            {
+                distance = distanceOptional.value();
+                isNextDistance = false;
+                resetCode();
+            }
         }
 
-        //adding current decoded length and distance
-        else if ((distance != 0) && (length != 0))
+        if ((distance != 0) && (length != 0))
         {
             lz77Matches.emplace_back(std::byte{0}, distance, length);
             distance = 0;

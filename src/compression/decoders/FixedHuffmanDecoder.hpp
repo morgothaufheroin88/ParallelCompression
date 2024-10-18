@@ -4,9 +4,12 @@
 
 #pragma once
 #include "../buffer/BitBuffer.hpp"
+#include "../encoders/FixedHuffmanEncoder.hpp"
 #include "../lz/LZ77.hpp"
+#include "../tree/HuffmanTree.hpp"
 #include <cstdint>
 #include <optional>
+#include <unordered_map>
 
 namespace deflate
 {
@@ -15,14 +18,15 @@ namespace deflate
     {
     private:
         BitBuffer bitBuffer;
-        std::uint16_t code{0};
-        std::uint32_t extraBits{0};
-        std::uint8_t codeBitPosition{0};
         bool isNextDistance = false;
-        inline void resetCode();
-        std::optional<std::uint16_t> tryDecodeLength();
-        std::optional<std::uint16_t> tryDecodeDistance();
-        std::optional<std::byte> tryDecodeLiteral();
+        static constexpr auto FIXED_LITERALS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLiterals()};
+        static constexpr auto FIXED_LENGTHS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLengths()};
+        static constexpr auto FIXED_DISTANCES_CODES{FixedHuffmanEncoder::initializeFixedCodesForDistances()};
+        CodeTable::ReverseHuffmanCodeTable literalsCodeTable;
+        CodeTable::ReverseHuffmanCodeTable distancesCodeTable;
+
+        std::optional<std::uint16_t> tryDecodeLength(std::uint16_t lengthFixedCode);
+        std::optional<std::uint16_t> tryDecodeDistance(std::uint16_t code, std::uint8_t codeBitPosition);
         void decodeHeader();
 
     public:
