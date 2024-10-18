@@ -3,6 +3,8 @@ cmake-build-debug
 cmake-build-debug-wsl
 cmake-build-release-wsl
 cmake-build-debug-clang-cl
+cmake-build-release-clang-cl
+cmake-build-relwithdebinfo
 cmake-build-debug-visual-studio
 out
 .idea
