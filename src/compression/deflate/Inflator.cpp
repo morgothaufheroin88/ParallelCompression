@@ -3,29 +3,31 @@
 //
 
 #include "Inflator.hpp"
+#include "../buffer/BitBuffer.hpp"
 #include "../decoders/DynamicHuffmanDecoder.hpp"
 #include "../decoders/FixedHuffmanDecoder.hpp"
-#include "../buffer/BitBuffer.hpp"
+
 #include <cstddef>
 #include <cstdint>
+#include <format>
 
 std::vector<std::byte> deflate::Inflator::getUncompressedBlock(const std::vector<std::byte> &data) const
 {
     std::vector<std::byte> result;
 
     //ignore first five bytes, because its header. two bytes of len and two bytes of nlen
-    result.insert(result.end(), data.begin() + 4, data.end());
+    result.insert(result.end(), data.begin() + 5, data.end());
     return result;
 }
 
 std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte> &data) const
 {
-    assert(data.size() > 0,"The input data is empty");
-    const auto header = data[0];
+    assert(!data.empty(), "The input data is empty");
 
-    [[maybe_unused]] const auto isLastBlock = static_cast<bool>(std::byte{((1 << 1) - 1)} & (header >> 0));
+    BitBuffer bits(data);
+    [[maybe_unused]] const auto isLastBlock = static_cast<bool>(bits.readBit());
 
-    if (const auto blockType = std::to_integer<std::uint8_t>(std::byte{((1 << 2) - 1)} & (header >> 1)); blockType == 0)
+    if (const auto blockType = bits.readBits(2); blockType == 0)
     {
         return getUncompressedBlock(data);
     }
@@ -41,7 +43,7 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
     }
     else
     {
-        assert(false , "Unsupported block type");
+        assert(false, std::format("Unsupported block type : {}", blockType));
     }
 
     return std::vector<std::byte>{};
