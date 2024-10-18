@@ -52,7 +52,7 @@ std::vector<std::byte> deflate::FixedHuffmanEncoder::encodeData(const std::vecto
     }
 
     //write end of block
-    bitBuffer.writeBits(0, 7);
+    bitBuffer.writeBits(FIXED_LITERALS_CODES[256].code, FIXED_LITERALS_CODES[256].codeLength);
 
     return bitBuffer.getBytes();
 }
