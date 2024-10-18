@@ -13,3 +13,4 @@
 #include "deflate/Deflator.hpp"
 #include "deflate/Inflator.hpp"
 #include "parallel/ParallelCompression.hpp"
+#include "parallel/ParallelDecompression.hpp"

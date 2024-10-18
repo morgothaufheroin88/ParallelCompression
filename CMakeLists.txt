@@ -1,8 +1,17 @@
 cmake_minimum_required(VERSION 3.28)
 project(Deflate)
-
 set(CMAKE_CXX_STANDARD 20)
-add_executable(Deflate src/main.cpp
+
+set(TARGET_NAME ParallelCompression)
+
+list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
+
+
+include(ConfigurePGO)
+include(SetConstexprLimit)
+include(CheckCompilerFlags)
+
+add_executable(${TARGET_NAME} src/main.cpp
         src/compression/lz/LZ77.cpp
         src/compression/lz/LZ77.hpp
         src/compression/buffer/BitBuffer.cpp
@@ -21,12 +30,23 @@ add_executable(Deflate src/main.cpp
         src/compression/deflate/Deflator.cpp
         src/compression/deflate/Deflator.hpp
         src/compression/deflate/Inflator.cpp
-        src/compression/deflate/Inflator.hpp)
+        src/compression/deflate/Inflator.hpp
+        src/compression/parallel/ParallelCompression.cpp
+        src/compression/parallel/ParallelCompression.hpp
+        src/compression/parallel/ParallelDecompression.cpp
+        src/compression/parallel/ParallelDecompression.hpp)
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(Deflate PRIVATE -mavx -mavx2 -ffast-math)
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(Deflate PRIVATE /arch:AVX2)
+
+
+configure_pgo(${TARGET_NAME})
+set_constexpr_limit(${TARGET_NAME})
+check_avx2_support(${TARGET_NAME})
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    # Проверка на тип компилятора и установка флагов
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(CMAKE_CXX_FLAGS_RELEASE "-O2 -mavx2")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        set(CMAKE_CXX_FLAGS_RELEASE "/O2 /arch:AVX2")
+    endif()
 endif()
-
-
