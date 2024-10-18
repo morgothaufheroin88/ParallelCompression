@@ -33,8 +33,7 @@ void parallel::ParallelCompression::splitDataToBlocks(const std::vector<std::byt
         proceededBytes += blockSize;
 
         Block block;
-        std::ranges::copy(data.begin() + (blockIndex * previousBlockSize), data.begin() + proceededBytes, std::back_inserter(block));
-
+        block.insert(block.end(), data.begin() + (blockIndex * previousBlockSize), data.begin() + proceededBytes);
         remainingBytes -= blockSize;
         previousBlockSize = static_cast<std::uint16_t>(blockSize);
 
@@ -77,6 +76,7 @@ std::vector<std::byte> parallel::ParallelCompression::compress(const std::vector
     splitDataToBlocks(data);
     createParallelJobs();
     std::vector<std::byte> result;
+    result.reserve(data.size());
 
     std::ranges::sort(compressedBlocks, [](const auto &left, const auto &right)
                       { return left.first < right.first; });
