@@ -40,13 +40,4 @@ add_executable(${TARGET_NAME} src/main.cpp
 
 configure_pgo(${TARGET_NAME})
 set_constexpr_limit(${TARGET_NAME})
-check_avx2_support(${TARGET_NAME})
-
-if(CMAKE_BUILD_TYPE STREQUAL "Release")
-    # Проверка на тип компилятора и установка флагов
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        set(CMAKE_CXX_FLAGS_RELEASE "-O2 -mavx2")
-    elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-        set(CMAKE_CXX_FLAGS_RELEASE "/O2 /arch:AVX2")
-    endif()
-endif()
+check_sse42_support(${TARGET_NAME})
