@@ -25,7 +25,6 @@ void parallel::ParallelDecompression::splitDataIntoBlocks(const std::vector<std:
 
         Block block;
         block.insert(block.end(), data.begin() + i, data.begin() + i + length);
-        std::cout << "Block size: " << block.size() << std::endl;
 
         compressedBlocks.push_back(block);
         i += length;

@@ -14,3 +14,4 @@
 #include "deflate/Inflator.hpp"
 #include "parallel/ParallelCompression.hpp"
 #include "parallel/ParallelDecompression.hpp"
+#include "parallel/CRC32.hpp"

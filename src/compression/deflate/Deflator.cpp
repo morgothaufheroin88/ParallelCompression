@@ -36,9 +36,11 @@ std::vector<std::byte> deflate::Deflator::createUncompressedBlock(const std::vec
     return result;
 }
 
-std::vector<std::byte> deflate::Deflator::compress(const std::vector<std::byte> &data, const bool isLastBlock) const
+std::vector<std::byte> deflate::Deflator::compress(const std::vector<std::byte> &data, const bool isLastBlock, const CompressionLevel compressionLevel) const
 {
-    const auto lz77Matches = LZ77::compress(data);
+    const auto isUseHashTable = (static_cast<std::int32_t>(compressionLevel) > 0);
+
+    const auto lz77Matches = LZ77::compress(data, isUseHashTable);
     const auto fixedEncoding = [&lz77Matches, isLastBlock = isLastBlock]()
     {
         return FixedHuffmanEncoder::encodeData(lz77Matches, isLastBlock);
@@ -77,7 +79,7 @@ std::vector<std::byte> deflate::Deflator::compress(const std::vector<std::byte> 
         return createUncompressedBlock(data, isLastBlock);
     }
 }
-std::vector<std::byte> deflate::Deflator::operator()(const std::vector<std::byte> &data, const bool isLastBlock) const
+std::vector<std::byte> deflate::Deflator::operator()(const std::vector<std::byte> &data, const bool isLastBlock, const CompressionLevel compressionLevel) const
 {
-    return compress(data, isLastBlock);
+    return compress(data, isLastBlock, compressionLevel);
 }

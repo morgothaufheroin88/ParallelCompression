@@ -11,6 +11,7 @@
 
 void parallel::ParallelCompression::splitDataToBlocks(const std::vector<std::byte> &data)
 {
+    const auto MAX_BLOCK_SIZE = static_cast<std::uint64_t>(std::abs(static_cast<std::int32_t>(compressionLevel)) * 1024);
     std::uint16_t blockIndex = 0;
     std::uint16_t previousBlockSize = 0;
     std::uint32_t proceededBytes = 0;
@@ -59,7 +60,7 @@ void parallel::ParallelCompression::createParallelJobs()
             jobs.pop();
         }
         isLastBlock = jobIndex == (block.size() - 1);
-        jobs.emplace(jobIndex, std::async(std::launch::async, deflator, block, isLastBlock));
+        jobs.emplace(jobIndex, std::async(std::launch::async, deflator, block, isLastBlock, compressionLevel));
         ++jobIndex;
     }
 
@@ -71,8 +72,10 @@ void parallel::ParallelCompression::createParallelJobs()
     }
 }
 
-std::vector<std::byte> parallel::ParallelCompression::compress(const std::vector<std::byte> &data)
+std::vector<std::byte> parallel::ParallelCompression::compress(const std::vector<std::byte> &data, const deflate::CompressionLevel newCompressionLevel)
 {
+    compressionLevel = newCompressionLevel;
+
     splitDataToBlocks(data);
     createParallelJobs();
     std::vector<std::byte> result;

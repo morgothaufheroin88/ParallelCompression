@@ -3,9 +3,18 @@
 //
 
 #pragma once
+#include "../decoders/DynamicHuffmanDecoder.hpp"
+#include "../deflate/Deflator.hpp"
+
+
 #include <cstdint>
 #include <future>
 #include <vector>
+
+namespace deflate
+{
+    enum class CompressionLevel;
+}
 
 namespace parallel
 {
@@ -19,15 +28,14 @@ namespace parallel
             std::future<Block> compressedBlockFuture;
         };
 
-        constexpr static std::uint64_t MAX_BLOCK_SIZE = 32 * 1024;
         std::vector<Block> blocks;
         std::vector<std::pair<std::uint16_t, Block>> compressedBlocks;
-
+        deflate::CompressionLevel compressionLevel = deflate::CompressionLevel::LEVEL_3;
 
         void splitDataToBlocks(const std::vector<std::byte> &data);
         void createParallelJobs();
 
     public:
-        std::vector<std::byte> compress(const std::vector<std::byte> &data);
+        std::vector<std::byte> compress(const std::vector<std::byte> &data, deflate::CompressionLevel newCompressionLevel);
     };
 }// namespace parallel
