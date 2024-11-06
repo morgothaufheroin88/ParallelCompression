@@ -19,11 +19,14 @@ namespace parallel
             std::future<Block> compressedBlockFuture;
         };
 
+
         std::vector<Block> compressedBlocks;
+        std::vector<std::uint32_t> hashes;
         std::vector<std::pair<std::uint16_t, Block>> decompressedBlocks;
 
-        void splitDataIntoBlocks(const std::vector<std::byte>& data);
+        void splitDataIntoBlocks(const std::vector<std::byte> &data);
         void createParallelJobs();
+
     public:
         std::vector<std::byte> decompress(const std::vector<std::byte> &data);
     };
