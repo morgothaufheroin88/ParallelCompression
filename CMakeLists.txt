@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project(Deflate)
+project(ParallelCompression)
 set(CMAKE_CXX_STANDARD 20)
 
 set(TARGET_NAME ParallelCompression)
@@ -11,7 +11,7 @@ include(ConfigurePGO)
 include(SetConstexprLimit)
 include(CheckCompilerFlags)
 
-add_executable(${TARGET_NAME} src/main.cpp
+set(SOURCE_FILES
         src/compression/lz/LZ77.cpp
         src/compression/lz/LZ77.hpp
         src/compression/buffer/BitBuffer.cpp
@@ -34,10 +34,22 @@ add_executable(${TARGET_NAME} src/main.cpp
         src/compression/parallel/ParallelCompression.cpp
         src/compression/parallel/ParallelCompression.hpp
         src/compression/parallel/ParallelDecompression.cpp
-        src/compression/parallel/ParallelDecompression.hpp)
+        src/compression/parallel/ParallelDecompression.hpp
+        src/compression/parallel/CRC32.hpp)
+
+
+add_library(${TARGET_NAME}-static STATIC ${SOURCE_FILES})
+add_library(${TARGET_NAME}-shared SHARED ${SOURCE_FILES})
 
 
 
-configure_pgo(${TARGET_NAME})
-set_constexpr_limit(${TARGET_NAME})
-check_sse42_support(${TARGET_NAME})
+configure_pgo(${TARGET_NAME}-static)
+set_constexpr_limit(${TARGET_NAME}-static)
+check_sse42_support(${TARGET_NAME}-static)
+
+configure_pgo(${TARGET_NAME}-shared)
+set_constexpr_limit(${TARGET_NAME}-shared)
+check_sse42_support(${TARGET_NAME}-shared)
+
+add_library(ParallelCompression::Static ALIAS ${TARGET_NAME}-static)
+add_library(ParallelCompression::Shared ALIAS ${TARGET_NAME}-shared)
