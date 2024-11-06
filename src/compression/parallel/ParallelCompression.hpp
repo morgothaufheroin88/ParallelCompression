@@ -25,11 +25,17 @@ namespace parallel
         struct CompressionJob
         {
             std::uint16_t id;
+            std::uint32_t hash;
             std::future<Block> compressedBlockFuture;
         };
-
+        struct CompressedBlock
+        {
+            Block data;
+            std::uint32_t hash;
+            std::uint16_t id;
+        };
         std::vector<Block> blocks;
-        std::vector<std::pair<std::uint16_t, Block>> compressedBlocks;
+        std::vector<CompressedBlock> compressedBlocks;
         deflate::CompressionLevel compressionLevel = deflate::CompressionLevel::LEVEL_3;
 
         void splitDataToBlocks(const std::vector<std::byte> &data);

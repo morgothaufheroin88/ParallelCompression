@@ -4,6 +4,7 @@
 
 #include "ParallelCompression.hpp"
 #include "../deflate/Deflator.hpp"
+#include "CRC32.hpp"
 #include <algorithm>
 #include <iterator>
 #include <queue>
@@ -56,18 +57,19 @@ void parallel::ParallelCompression::createParallelJobs()
         if (jobIndex >= maxThreads)
         {
             const auto result = jobs.front().compressedBlockFuture.get();
-            compressedBlocks.emplace_back(jobs.front().id, result);
+            compressedBlocks.emplace_back(result, jobs.front().hash, jobs.front().id);
             jobs.pop();
         }
         isLastBlock = jobIndex == (block.size() - 1);
-        jobs.emplace(jobIndex, std::async(std::launch::async, deflator, block, isLastBlock, compressionLevel));
+        const auto uncompressedBlockHash = deflate::crc32(block);
+        jobs.emplace(jobIndex, uncompressedBlockHash, std::async(std::launch::async, deflator, block, isLastBlock, compressionLevel));
         ++jobIndex;
     }
 
     while (!jobs.empty())
     {
         const auto result = jobs.front().compressedBlockFuture.get();
-        compressedBlocks.emplace_back(jobs.front().id, result);
+        compressedBlocks.emplace_back(result, jobs.front().hash, jobs.front().id);
         jobs.pop();
     }
 }
@@ -82,16 +84,23 @@ std::vector<std::byte> parallel::ParallelCompression::compress(const std::vector
     result.reserve(data.size());
 
     std::ranges::sort(compressedBlocks, [](const auto &left, const auto &right)
-                      { return left.first < right.first; });
+                      { return left.id < right.id; });
 
-    for (auto &[id, compressedBlock]: compressedBlocks)
+
+    for (auto &[compressedBlock, hash, id]: compressedBlocks)
     {
         const auto compressedSize = static_cast<std::uint16_t>(compressedBlock.size());
 
         result.push_back(std::byte{static_cast<std::uint8_t>(compressedSize & 0xFF)});
         result.push_back(std::byte{static_cast<std::uint8_t>((compressedSize >> 8) & 0xFF)});
 
+        result.push_back(std::byte{static_cast<std::uint8_t>((hash >> 24) & 0xFF)});
+        result.push_back(std::byte{static_cast<std::uint8_t>((hash >> 16) & 0xFF)});
+        result.push_back(std::byte{static_cast<std::uint8_t>((hash >> 8) & 0xFF)});
+        result.push_back(std::byte{static_cast<std::uint8_t>(hash & 0xFF)});
+
         result.insert(result.end(), compressedBlock.begin(), compressedBlock.end());
     }
+
     return result;
 }
