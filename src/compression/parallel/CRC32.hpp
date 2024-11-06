@@ -26,7 +26,8 @@ namespace deflate
              crc = _mm_crc32_u8(crc, static_cast<std::uint8_t>(byte));
         }
         return crc ^ 0xFF'FF'FF'FFU;
-#elif
+#else
+
 
         for(const auto byte : data)
         {
