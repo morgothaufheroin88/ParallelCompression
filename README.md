@@ -64,6 +64,9 @@ To use **ParallelCompression** in your project, include the library and link it 
     ```
 
 3. Include the header files from **ParallelCompression** to access its functionality for compressing and decompressing data blocks.
+   ```cmake
+    target_include_directories(YourTarget PRIVATE (path/to/ParallelCompression/src)
+    ```
 
 ### Example Code
 
