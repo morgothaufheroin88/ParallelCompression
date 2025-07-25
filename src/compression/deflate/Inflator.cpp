@@ -24,11 +24,11 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
 {
     assert(!data.empty(), "The input data is empty");
 
-    BitBuffer bits(data);
-    _isLastBlock = static_cast<bool>(bits.readBit());
+    bitBuffer = std::make_shared<BitBuffer>(data);
 
-    bitBuffer = std::make_shared<BitBuffer>(bits);
-    if (const auto blockType = bits.readBits(2); blockType == 0)
+    _isLastBlock = static_cast<bool>(bitBuffer->readBit());
+
+    if (const auto blockType = bitBuffer->readBits(2); blockType == 0)
     {
         return getUncompressedBlock(data);
     }
