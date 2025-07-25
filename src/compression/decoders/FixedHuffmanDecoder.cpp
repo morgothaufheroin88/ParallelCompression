@@ -129,7 +129,7 @@ std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
         codeBitPosition = 0;
     };
 
-    while ((!isEndOfBlock)  || (bitBuffer.next()))
+    while ((!isEndOfBlock))
     {
         //read one bit from byte
         const auto bit = bitBuffer.readBit();
