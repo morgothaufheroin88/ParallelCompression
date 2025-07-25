@@ -56,16 +56,6 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance(con
     return std::nullopt;
 }
 
-void deflate::FixedHuffmanDecoder::decodeHeader()
-{
-    //check if it is a last block
-    [[maybe_unused]] const auto isLastBlock = bitBuffer->readBits(1);
-
-    //check block type
-    const auto blockType = bitBuffer->readBits(2);
-    assert(blockType == 1, "Wrong block type!");
-}
-
 deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitBuffer) : bitBuffer(newBitBuffer)
 {
 
@@ -107,8 +97,6 @@ deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const std::shared_ptr<BitBuffe
         }
     }
 
-
-    decodeHeader();
 }
 
 std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()

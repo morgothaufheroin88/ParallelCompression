@@ -28,7 +28,6 @@ namespace deflate
 
         std::optional<std::uint16_t> tryDecodeLength(std::uint16_t lengthFixedCode);
         std::optional<std::uint16_t> tryDecodeDistance(std::uint16_t code, std::uint8_t codeBitPosition);
-        void decodeHeader();
 
     public:
         explicit FixedHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitBuffer);

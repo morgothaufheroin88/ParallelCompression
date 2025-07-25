@@ -8,11 +8,6 @@
 
 void deflate::DynamicHuffmanDecoder::decodeHeader()
 {
-    //read block type
-    [[maybe_unused]] const auto isLastBlock = bitBuffer->readBit();
-    const auto blockType = bitBuffer->readBits(2);
-    assert(blockType == 0b10, "Wrong block type!");
-
     //read count of literals in table
     HLIT = static_cast<std::uint8_t>(bitBuffer->readBits(5));
     assert((HLIT + 257) > 0, "HLIT less or equal zero");
