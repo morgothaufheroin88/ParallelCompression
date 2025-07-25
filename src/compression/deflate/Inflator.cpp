@@ -20,12 +20,12 @@ std::vector<std::byte> deflate::Inflator::getUncompressedBlock(const std::vector
     return result;
 }
 
-std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte> &data) const
+std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte> &data)
 {
     assert(!data.empty(), "The input data is empty");
 
     BitBuffer bits(data);
-    [[maybe_unused]] const auto isLastBlock = static_cast<bool>(bits.readBit());
+    _isLastBlock = static_cast<bool>(bits.readBit());
 
     if (const auto blockType = bits.readBits(2); blockType == 0)
     {
@@ -34,12 +34,16 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
     else if (blockType == 1)
     {
         FixedHuffmanDecoder decoder(BitBuffer{data});
-        return LZ77::decompress(decoder.decodeData());
+        const auto buffer = decoder.decodeData();
+        blockSize = decoder.getBlockSize();
+        return LZ77::decompress(buffer);
     }
     else if (blockType == 2)
     {
         DynamicHuffmanDecoder decoder(BitBuffer{data});
-        return LZ77::decompress(decoder.decodeData());
+        const auto buffer = decoder.decodeData();
+        blockSize = decoder.getBlockSize();
+        return LZ77::decompress(buffer);
     }
     else
     {
@@ -49,7 +53,16 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
     return std::vector<std::byte>{};
 }
 
-std::vector<std::byte> deflate::Inflator::operator()(const std::vector<std::byte> &data) const
+std::vector<std::byte> deflate::Inflator::operator()(const std::vector<std::byte> &data)
 {
     return decompress(data);
+}
+std::size_t deflate::Inflator::getBlockSize() const noexcept
+{
+    return blockSize;
+}
+
+bool deflate::Inflator::isLastBlock() const noexcept
+{
+    return _isLastBlock;
 }

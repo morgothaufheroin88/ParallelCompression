@@ -39,5 +39,7 @@ namespace deflate
     public:
         explicit DynamicHuffmanDecoder(const BitBuffer &newBitsBuffer);
         std::vector<LZ77::Match> decodeData();
+        [[nodiscard]] std::size_t getBlockSize() const noexcept;
+
     };
 }// namespace deflate

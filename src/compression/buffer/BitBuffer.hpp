@@ -38,5 +38,6 @@ namespace deflate
         void writeBits(std::uint32_t value, std::size_t numberOfBits);
         [[nodiscard]] std::vector<std::byte> getBytes();
         [[nodiscard]] bool next() const noexcept;
+        [[nodiscard]] std::size_t getByteIndex() const noexcept;
     };
 }// namespace deflate

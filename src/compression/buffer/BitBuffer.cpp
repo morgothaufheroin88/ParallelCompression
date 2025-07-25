@@ -79,3 +79,8 @@ bool deflate::BitBuffer::next() const noexcept
 {
     return byteIndex < buffer.size();
 }
+
+std::size_t deflate::BitBuffer::getByteIndex() const noexcept
+{
+    return byteIndex;
+}

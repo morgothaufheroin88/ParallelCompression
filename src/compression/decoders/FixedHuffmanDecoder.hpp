@@ -32,5 +32,6 @@ namespace deflate
     public:
         explicit FixedHuffmanDecoder(const BitBuffer &newBitBuffer);
         std::vector<LZ77::Match> decodeData();
+        [[nodiscard]] std::size_t getBlockSize() const noexcept;
     };
 }// namespace deflate

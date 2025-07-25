@@ -199,7 +199,7 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
         codeBitPosition = 0;
     };
 
-    while ((bitBuffer.next()) && (!isEndOfBlock))
+    while ((bitBuffer.next()) || (!isEndOfBlock))
     {
         //read one bit from byte
         const auto bit = bitBuffer.readBit();
@@ -253,6 +253,11 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeData()
 {
     decodeHeader();
     return decodeBody();
+}
+
+std::size_t deflate::DynamicHuffmanDecoder::getBlockSize() const noexcept
+{
+    return bitBuffer.getByteIndex();
 }
 
 deflate::DynamicHuffmanDecoder::DynamicHuffmanDecoder(const BitBuffer &newBitsBuffer) : bitBuffer(newBitsBuffer)
