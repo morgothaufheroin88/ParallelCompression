@@ -8,6 +8,7 @@
 #include "../lz/LZ77.hpp"
 #include "../tree/HuffmanTree.hpp"
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 
@@ -17,7 +18,7 @@ namespace deflate
     class FixedHuffmanDecoder
     {
     private:
-        BitBuffer bitBuffer;
+        std::shared_ptr<BitBuffer> bitBuffer{nullptr};
         bool isNextDistance = false;
         static constexpr auto FIXED_LITERALS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLiterals()};
         static constexpr auto FIXED_LENGTHS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLengths()};
@@ -30,7 +31,7 @@ namespace deflate
         void decodeHeader();
 
     public:
-        explicit FixedHuffmanDecoder(const BitBuffer &newBitBuffer);
+        explicit FixedHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitBuffer);
         std::vector<LZ77::Match> decodeData();
         [[nodiscard]] std::size_t getBlockSize() const noexcept;
     };

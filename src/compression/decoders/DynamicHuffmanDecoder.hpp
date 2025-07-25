@@ -8,6 +8,7 @@
 #include "../lz/LZ77.hpp"
 #include "../tree/HuffmanTree.hpp"
 
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -16,7 +17,7 @@ namespace deflate
     class DynamicHuffmanDecoder
     {
     private:
-        BitBuffer bitBuffer;
+        std::shared_ptr<BitBuffer> bitBuffer{nullptr};
         void decodeHeader();
         std::vector<std::uint8_t> decodeCCL();
         void decodeCodeLengths();
@@ -37,7 +38,7 @@ namespace deflate
         CodeTable::ReverseHuffmanCodeTable distancesCodeTable;
 
     public:
-        explicit DynamicHuffmanDecoder(const BitBuffer &newBitsBuffer);
+        explicit DynamicHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitsBuffer);
         std::vector<LZ77::Match> decodeData();
         [[nodiscard]] std::size_t getBlockSize() const noexcept;
 

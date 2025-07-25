@@ -6,6 +6,7 @@
 #include "../buffer/BitBuffer.hpp"
 
 
+#include <memory>
 #include <vector>
 
 
@@ -16,6 +17,7 @@ namespace deflate
     private:
         [[nodiscard]] std::vector<std::byte> getUncompressedBlock(const std::vector<std::byte> &data) const;
         std::size_t blockSize{0};
+        std::shared_ptr<BitBuffer> bitBuffer{nullptr};
         bool _isLastBlock{false};
 
     public:

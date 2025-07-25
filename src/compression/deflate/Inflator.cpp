@@ -27,20 +27,21 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
     BitBuffer bits(data);
     _isLastBlock = static_cast<bool>(bits.readBit());
 
+    bitBuffer = std::make_shared<BitBuffer>(bits);
     if (const auto blockType = bits.readBits(2); blockType == 0)
     {
         return getUncompressedBlock(data);
     }
     else if (blockType == 1)
     {
-        FixedHuffmanDecoder decoder(BitBuffer{data});
+        FixedHuffmanDecoder decoder(bitBuffer);
         const auto buffer = decoder.decodeData();
         blockSize = decoder.getBlockSize();
         return LZ77::decompress(buffer);
     }
     else if (blockType == 2)
     {
-        DynamicHuffmanDecoder decoder(BitBuffer{data});
+        DynamicHuffmanDecoder decoder(bitBuffer);
         const auto buffer = decoder.decodeData();
         blockSize = decoder.getBlockSize();
         return LZ77::decompress(buffer);

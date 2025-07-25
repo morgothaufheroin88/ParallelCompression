@@ -18,7 +18,7 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength(const
         std::uint32_t extraBits = 0;
         if (lengthCodesIterator->extraBitsCount > 0)
         {
-            extraBits = bitBuffer.readBits(lengthCodesIterator->extraBitsCount);
+            extraBits = bitBuffer->readBits(lengthCodesIterator->extraBitsCount);
         }
 
         return lengthCodesIterator->length + extraBits;
@@ -46,7 +46,7 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance(con
             std::uint32_t extraBits = 0;
             if (distanceCodesIterator->extraBitsCount > 0)
             {
-                extraBits = bitBuffer.readBits(distanceCodesIterator->extraBitsCount);
+                extraBits = bitBuffer->readBits(distanceCodesIterator->extraBitsCount);
             }
 
             return distanceCodesIterator->distance + extraBits;
@@ -59,14 +59,14 @@ std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance(con
 void deflate::FixedHuffmanDecoder::decodeHeader()
 {
     //check if it is a last block
-    [[maybe_unused]] const auto isLastBlock = bitBuffer.readBits(1);
+    [[maybe_unused]] const auto isLastBlock = bitBuffer->readBits(1);
 
     //check block type
-    const auto blockType = bitBuffer.readBits(2);
+    const auto blockType = bitBuffer->readBits(2);
     assert(blockType == 1, "Wrong block type!");
 }
 
-deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const BitBuffer &newBitBuffer) : bitBuffer(newBitBuffer)
+deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitBuffer) : bitBuffer(newBitBuffer)
 {
 
     for (const auto &fixedCode: FIXED_LITERALS_CODES)
@@ -132,7 +132,7 @@ std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
     while ((!isEndOfBlock))
     {
         //read one bit from byte
-        const auto bit = bitBuffer.readBit();
+        const auto bit = bitBuffer->readBit();
         code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
         ++codeBitPosition;
 
@@ -178,5 +178,5 @@ std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
 }
 std::size_t deflate::FixedHuffmanDecoder::getBlockSize() const noexcept
 {
-    return bitBuffer.getByteIndex();
+    return bitBuffer->getByteIndex();
 }
