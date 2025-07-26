@@ -33,6 +33,7 @@ namespace deflate
     public:
         BitBuffer() = default;
         explicit BitBuffer(const std::vector<std::byte> &newBuffer);
+        void alignToByte();
         std::byte readBit();
         std::uint32_t readBits(std::size_t numberOfBits);
         void writeBits(std::uint32_t value, std::size_t numberOfBits);

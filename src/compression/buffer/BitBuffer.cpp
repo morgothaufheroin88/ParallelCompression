@@ -11,6 +11,16 @@ deflate::BitBuffer::BitBuffer(const std::vector<std::byte> &newBuffer) : buffer(
     currentByte = newBuffer[0];
 }
 
+void deflate::BitBuffer::alignToByte()
+{
+    if (byteIndex != 0)
+    {
+        bitPosition = 0;
+        ++byteIndex;
+    }
+}
+
+
 std::byte deflate::BitBuffer::readBit()
 {
     if (buffer.empty())
