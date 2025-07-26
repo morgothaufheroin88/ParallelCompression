@@ -30,5 +30,6 @@ namespace deflate
     public:
         static std::vector<Match> compress(const std::vector<std::byte> &dataToCompress, bool isUseHashMap);
         static std::vector<std::byte> decompress(const std::vector<Match> &compressedData);
+        static void decompress(const std::vector<Match> &compressedData, std::vector<std::byte> &decompressedData);
     };
 }// namespace deflate
