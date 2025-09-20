@@ -209,4 +209,9 @@ namespace deflate
 
         [[nodiscard]] static std::vector<std::byte> encodeData(const std::vector<LZ77::Match> &dataToEncode, bool isLastBlock);
     };
+
+    static constexpr auto FIXED_LITERALS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLiterals()};
+    static constexpr auto FIXED_LENGTHS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLengths()};
+    static constexpr auto FIXED_DISTANCES_CODES{FixedHuffmanEncoder::initializeFixedCodesForDistances()};
+
 }// namespace deflate

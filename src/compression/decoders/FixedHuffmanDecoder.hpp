@@ -20,9 +20,6 @@ namespace deflate
     private:
         std::shared_ptr<BitBuffer> bitBuffer{nullptr};
         bool isNextDistance = false;
-        static constexpr auto FIXED_LITERALS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLiterals()};
-        static constexpr auto FIXED_LENGTHS_CODES{FixedHuffmanEncoder::initializeFixedCodesForLengths()};
-        static constexpr auto FIXED_DISTANCES_CODES{FixedHuffmanEncoder::initializeFixedCodesForDistances()};
         CodeTable::ReverseHuffmanCodeTable literalsCodeTable;
         CodeTable::ReverseHuffmanCodeTable distancesCodeTable;
 

@@ -78,8 +78,6 @@ void deflate::DynamicHuffmanEncoder::encodeCodeLengths(const std::vector<std::ui
 void deflate::DynamicHuffmanEncoder::encodeLZ77Matches(const std::vector<LZ77::Match> &lz77Matches)
 {
     assert(!lz77Matches.empty(), "LZ77 matches is empty!");
-    auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
-    auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
 
     auto literalsCodeTable = CodeTable::createCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
     auto distancesCodeTable = CodeTable::createCodeTable(distancesCodeLengths, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
@@ -124,9 +122,6 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
 {
     std::vector<std::int16_t> literalsAndLengths;
     std::vector<std::int16_t> distances;
-
-    auto FIXED_LENGTHS_CODES = FixedHuffmanEncoder::initializeFixedCodesForLengths();
-    auto FIXED_DISTANCES_CODES = FixedHuffmanEncoder::initializeFixedCodesForDistances();
 
     for (const auto &match: lz77Matches)
     {
