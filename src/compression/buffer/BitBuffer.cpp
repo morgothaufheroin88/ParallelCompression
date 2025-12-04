@@ -23,33 +23,41 @@ void deflate::BitBuffer::alignToByte()
 
 std::byte deflate::BitBuffer::readBit()
 {
-    if (buffer.empty())
+    if (bitsAvailable == 0)
     {
-        return std::byte{0};
-    }
-
-    const auto bit = std::byte{static_cast<std::uint8_t>((static_cast<std::uint16_t>(currentByte) >> bitPosition) & 1)};
-    ++bitPosition;
-    if (bitPosition == 8)
-    {
-        ++byteIndex;
         if (byteIndex < buffer.size())
         {
-            bitPosition = 0;
-            currentByte = buffer[byteIndex];
+            bitCache = static_cast<std::uint64_t>(std::to_integer<uint8_t>(buffer[byteIndex])) << bitsAvailable;
+            bitsAvailable += 8;
+            ++byteIndex;
         }
     }
+
+    const auto bit = std::byte{static_cast<uint8_t>(bitCache & 1)};
+    bitCache >>= 1;
+    --bitsAvailable;
     return bit;
 }
 
 std::uint32_t deflate::BitBuffer::readBits(const std::size_t numberOfBits)
 {
-    std::uint32_t result = 0;
-    for (std::size_t i = 0; i < numberOfBits; ++i)
+    while (bitsAvailable < numberOfBits)
     {
-        const auto bit = readBit();
-        result |= static_cast<std::uint32_t>(bit) << i;
+        if (byteIndex < buffer.size())
+        {
+            bitCache |= (static_cast<uint64_t>(std::to_integer<uint8_t>(buffer[byteIndex])) << bitsAvailable);
+            bitsAvailable += 8;
+            ++byteIndex;
+        }
+        else
+        {
+            break;
+        }
     }
+
+    const auto result = static_cast<uint32_t>(bitCache & ((1ull << numberOfBits) - 1));
+    bitCache >>= numberOfBits;
+    bitsAvailable -= numberOfBits;
     return result;
 }
 
@@ -93,4 +101,18 @@ bool deflate::BitBuffer::next() const noexcept
 std::size_t deflate::BitBuffer::getByteIndex() const noexcept
 {
     return byteIndex;
+}
+
+std::uint32_t deflate::BitBuffer::peekBits(std::uint32_t numberOfBits)
+{
+    const auto savedByteIndex = byteIndex;
+    const auto savedBitPosition = bitPosition;
+    const auto savedCurrentByte = currentByte;
+    const auto value = readBits(numberOfBits);
+
+    bitPosition = savedBitPosition;
+    currentByte = savedCurrentByte;
+    byteIndex = savedByteIndex;
+
+    return value;
 }

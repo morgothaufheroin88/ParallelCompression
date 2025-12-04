@@ -48,24 +48,23 @@ std::uint32_t deflate::DynamicHuffmanDecoder::reverseBits(const std::uint32_t bi
 
 std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeLength(const std::uint16_t lengthFixedCode)
 {
-    const auto findByIndex = [&lengthFixedCode](const auto &element)
+    if (lengthFixedCode < 257 || lengthFixedCode > 285)
     {
-        return ((element.index + 257) == lengthFixedCode) && (element.code != 0) && (element.codeLength != 0);
-    };
-
-    if (const auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
-    {
-        std::uint16_t extraBits = 0;
-        if (lengthCodesIterator->extraBitsCount > 0)
-        {
-            extraBits = static_cast<std::uint16_t>(bitBuffer->readBits(lengthCodesIterator->extraBitsCount));
-        }
-
-        return lengthCodesIterator->length + extraBits;
+        return std::nullopt;
     }
 
-    return std::nullopt;
+    const auto index = lengthFixedCode - 257;
+    const auto base = LENGTH_BASE[index];
+    const auto extra = LENGTH_EXTRA[index];
+    if (extra == 0)
+    {
+        return base;
+    }
+
+    const auto extraBits = bitBuffer->readBits(extra);
+    return base + extraBits;
 }
+
 
 std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(const std::uint32_t code, const std::uint8_t codeBitPosition)
 {
@@ -96,11 +95,33 @@ std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(c
     return std::nullopt;
 }
 
+std::optional<std::uint16_t> deflate::DynamicHuffmanDecoder::tryDecodeDistance(std::uint16_t symbol)
+{
+    if (symbol >= 30)
+    {
+        return std::nullopt;
+    }
+    const auto base = DISTANCE_BASE[symbol];
+    const auto extra = DISTANCE_EXTRA[symbol];
+
+    if (extra == 0)
+    {
+        return base;
+    }
+
+    const auto extraBits = bitBuffer->readBits(extra);
+    return base + extraBits;
+}
+
 void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
 {
     const auto ccl = decodeCCL();
-    const auto reverseCodeTable = deflate::CodeTable::createReverseCodeTable(ccl, 19);
+    auto reverseCodeTable = deflate::CodeTable::createReverseCodeTable(ccl, 19);
+
     const auto codeLengthsCount = HLIT + 257 + HDIST + 1;
+    literalsCodeLengths.reserve(HLIT + 257);
+    distanceCodeLengths.reserve(HDIST + 1);
+
     std::uint16_t i{0};
     std::uint16_t code{0};
     std::uint8_t codeBitPosition{0};
@@ -125,45 +146,42 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
 
     while (i < codeLengthsCount)
     {
-        //read one bit from byte
-        const auto bit = bitBuffer->readBit();
-        code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
+        code |= static_cast<std::uint32_t>(std::to_integer<uint16_t>(bitBuffer->readBit()) << codeBitPosition);
         ++codeBitPosition;
 
-        const auto reversedBits = reverseBits(code, codeBitPosition);
 
+        const auto reversedBits = reverseBits(code, codeBitPosition);
         const auto it = std::ranges::find_if(reverseCodeTable, [reversedBits, codeBitPosition](const auto &pair)
-                                             { return (pair.first.code == reversedBits) && (pair.first.length == codeBitPosition); });
+                                             { return pair.first.code == reversedBits && pair.first.length == codeBitPosition; });
 
         if (it != reverseCodeTable.end())
         {
-            if (it->second == 18)
+            const auto symbol = it->second;
+
+            if (symbol == 18)
             {
                 const auto repeat = bitBuffer->readBits(7);
                 repeatNumbers(repeat + 11, 0);
             }
-            else if (it->second == 17)
+            else if (symbol == 17)
             {
                 const auto repeat = bitBuffer->readBits(3);
                 repeatNumbers(repeat + 3, 0);
             }
-            else if ((previousCode < 16) && (previousCode > 0) && (it->second == 16))
-            {
-                previousLength = previousCode;
-                const auto repeat = bitBuffer->readBits(2);
-                repeatNumbers(repeat + 3, static_cast<std::uint8_t>(previousLength));
-            }
-            else if ((previousCode == 16) && (it->second == 16))
+            else if (symbol == 16)
             {
                 const auto repeat = bitBuffer->readBits(2);
-                repeatNumbers(repeat + 3, static_cast<std::uint8_t>(previousLength));
+                repeatNumbers(repeat + 3, previousLength);
             }
             else
             {
-                repeatNumbers(1, static_cast<std::uint8_t>(it->second));
+                repeatNumbers(1, symbol);
             }
 
-            previousCode = it->second;
+            previousCode = symbol;
+            if (symbol < 16)
+                previousLength = symbol;
+
             code = 0;
             codeBitPosition = 0;
         }
@@ -173,67 +191,85 @@ void deflate::DynamicHuffmanDecoder::decodeCodeLengths()
 std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
 {
     std::vector<LZ77::Match> matches;
-    std::uint16_t code{0};
-    std::uint32_t reversedCode{0};
-    std::uint8_t codeBitPosition{0};
-    std::uint16_t distance{0};
-    std::uint16_t length{0};
-    bool isEndOfBlock{false};
 
-    const auto findCodeInCodeTable = [&reversedCode, &codeBitPosition](const auto &pair)
-    { return (pair.first.code == reversedCode) && (pair.first.length == codeBitPosition); };
+    std::uint32_t reversedCode = 0;
+    std::uint8_t codeBitPosition = 0;
 
-    literalsCodeTable = CodeTable::createReverseCodeTable(literalsCodeLengths, FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
-    distancesCodeTable = CodeTable::createReverseCodeTable(distanceCodeLengths, FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
+    std::uint16_t distance = 0;
+    std::uint16_t length = 0;
 
+    bool isEndOfBlock = false;
 
-    const auto resetCode = [&code, &reversedCode, &codeBitPosition]()
+    const auto resetCode = [&]()
     {
         reversedCode = 0;
-        code = 0;
         codeBitPosition = 0;
     };
 
-    while ((!isEndOfBlock))
+    // build normal reverse tables
+    literalsCodeTable = CodeTable::createReverseCodeTable(
+            literalsCodeLengths,
+            FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
+    distancesCodeTable = CodeTable::createReverseCodeTable(
+            distanceCodeLengths,
+            FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
+
+
+    // fallback search lambda
+    const auto findCodeInCodeTable = [&](const auto &pair)
     {
-        //read one bit from byte
-        const auto bit = bitBuffer->readBit();
-        code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
+        return (pair.first.code == reversedCode) && (pair.first.length == codeBitPosition);
+    };
+
+    while (!isEndOfBlock)
+    {
+        // ---- read next bit (LSB-first building of reversed code) ----
+        const auto bit = std::to_integer<uint16_t>(bitBuffer->readBit());
+        reversedCode = (reversedCode << 1) | bit;
         ++codeBitPosition;
 
-        reversedCode = reverseBits(code, codeBitPosition);
-
-        //check if code exists in  code table for literals and distances
-        if (const auto literalsCodeTableIterator = std::ranges::find_if(literalsCodeTable, findCodeInCodeTable); (literalsCodeTableIterator != literalsCodeTable.end()) && (!isNextDistance))
+        if (!isNextDistance)
         {
-            if (literalsCodeTableIterator->second < 256)
+            CodeTable::CanonicalHuffmanCode huffmanCode{static_cast<std::uint16_t>(reversedCode), codeBitPosition};
+            if (const auto it = literalsCodeTable.find(huffmanCode);
+                it != literalsCodeTable.end())
             {
-                matches.emplace_back(std::byte{static_cast<std::uint8_t>(literalsCodeTableIterator->second)}, 0, 1);
-                resetCode();
-            }
-            else if (literalsCodeTableIterator->second == 256)
-            {
-                isEndOfBlock = true;
-            }
-            else if (auto lengthOptional = tryDecodeLength(literalsCodeTableIterator->second); lengthOptional.has_value())
-            {
-                length = lengthOptional.value();
-                isNextDistance = true;
-                resetCode();
+                const uint16_t symbol = it->second;
+
+                if (symbol < 256)
+                {
+                    matches.emplace_back(std::byte{(uint8_t) symbol}, 0, 1);
+                    resetCode();
+                }
+                else if (symbol == 256)
+                {
+                    isEndOfBlock = true;
+                }
+                else if (auto lenOpt = tryDecodeLength(symbol); lenOpt.has_value())
+                {
+                    length = lenOpt.value();
+                    isNextDistance = true;
+                    resetCode();
+                }
+
+                continue;
             }
         }
 
+        // ---- FALLBACK: full search distance ----
         if (isNextDistance)
         {
-            if (auto distanceOptional = tryDecodeDistance(reversedCode, codeBitPosition); distanceOptional.has_value())
+            if (auto distOpt = tryDecodeDistance(reversedCode, codeBitPosition); distOpt.has_value())
             {
-                distance = distanceOptional.value();
+                distance = distOpt.value();
                 isNextDistance = false;
                 resetCode();
+                continue;
             }
         }
 
-        if ((distance != 0) && (length != 0))
+        // ---- Output match when both decoded ----
+        if (distance != 0 && length != 0)
         {
             matches.emplace_back(std::byte{0}, distance, length);
             distance = 0;
