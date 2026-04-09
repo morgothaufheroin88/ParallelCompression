@@ -6,24 +6,41 @@
 #include <cstddef>
 #include <cstdint>
 #include <vector>
-#ifdef SSE42_SUPPORTED
+
+#if defined(SSE42_SUPPORTED) && (defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86))
+#define PARALLEL_COMPRESSION_X86_CRC32 1
 #include <smmintrin.h>
+#else
+#define PARALLEL_COMPRESSION_X86_CRC32 0
+#endif
+
+#if (defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)) && defined(__ARM_FEATURE_CRC32)
+#define PARALLEL_COMPRESSION_ARM_CRC32 1
+#include <arm_acle.h>
+#else
+#define PARALLEL_COMPRESSION_ARM_CRC32 0
 #endif
 
 namespace deflate
 {
-#if defined(__clang__) || defined(__GNUC__)
-    __attribute__((target("crc32")))
+#if PARALLEL_COMPRESSION_X86_CRC32 && (defined(__clang__) || defined(__GNUC__))
+    __attribute__((target("sse4.2")))
 #endif
 
     inline std::uint32_t crc32(const std::vector<std::byte> &data)
     {
         std::uint32_t crc = 0xFF'FF'FF'FFU;
 
-#ifdef SSE42_SUPPORTED
+#if PARALLEL_COMPRESSION_X86_CRC32
         for(const auto byte : data)
         {
              crc = _mm_crc32_u8(crc, static_cast<std::uint8_t>(byte));
+        }
+        return crc ^ 0xFF'FF'FF'FFU;
+#elif PARALLEL_COMPRESSION_ARM_CRC32
+        for (const auto byte: data)
+        {
+            crc = __crc32cb(crc, static_cast<std::uint8_t>(byte));
         }
         return crc ^ 0xFF'FF'FF'FFU;
 #else

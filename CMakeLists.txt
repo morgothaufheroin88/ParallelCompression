@@ -41,6 +41,9 @@ set(SOURCE_FILES
 add_library(${TARGET_NAME}-static STATIC ${SOURCE_FILES})
 add_library(${TARGET_NAME}-shared SHARED ${SOURCE_FILES})
 
+# ffi_chest links the static archive into a shared object, so the archive
+# must be compiled as position-independent code on ELF platforms.
+set_target_properties(${TARGET_NAME}-static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 
 configure_pgo(${TARGET_NAME}-static)
