@@ -192,7 +192,7 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
 {
     std::vector<LZ77::Match> matches;
 
-    std::uint32_t reversedCode = 0;
+    std::uint32_t code = 0;
     std::uint8_t codeBitPosition = 0;
 
     std::uint16_t distance = 0;
@@ -202,11 +202,10 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
 
     const auto resetCode = [&]()
     {
-        reversedCode = 0;
+        code = 0;
         codeBitPosition = 0;
     };
 
-    // build normal reverse tables
     literalsCodeTable = CodeTable::createReverseCodeTable(
             literalsCodeLengths,
             FixedHuffmanEncoder::LITERALS_AND_LENGTHS_ALPHABET_SIZE);
@@ -214,23 +213,18 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
             distanceCodeLengths,
             FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE);
 
-
-    // fallback search lambda
-    const auto findCodeInCodeTable = [&](const auto &pair)
-    {
-        return (pair.first.code == reversedCode) && (pair.first.length == codeBitPosition);
-    };
-
     while (!isEndOfBlock)
     {
-        // ---- read next bit (LSB-first building of reversed code) ----
         const auto bit = std::to_integer<uint16_t>(bitBuffer->readBit());
-        reversedCode = (reversedCode << 1) | bit;
+        code |= static_cast<std::uint32_t>(bit) << codeBitPosition;
         ++codeBitPosition;
+        const auto canonicalCode = reverseBits(code, codeBitPosition);
+        const CodeTable::CanonicalHuffmanCode huffmanCode{
+                static_cast<std::uint16_t>(canonicalCode),
+                codeBitPosition};
 
         if (!isNextDistance)
         {
-            CodeTable::CanonicalHuffmanCode huffmanCode{static_cast<std::uint16_t>(reversedCode), codeBitPosition};
             if (const auto it = literalsCodeTable.find(huffmanCode);
                 it != literalsCodeTable.end())
             {
@@ -255,25 +249,19 @@ std::vector<deflate::LZ77::Match> deflate::DynamicHuffmanDecoder::decodeBody()
                 continue;
             }
         }
-
-        // ---- FALLBACK: full search distance ----
-        if (isNextDistance)
+        else if (const auto it = distancesCodeTable.find(huffmanCode);
+                 it != distancesCodeTable.end())
         {
-            if (auto distOpt = tryDecodeDistance(reversedCode, codeBitPosition); distOpt.has_value())
+            if (auto distOpt = tryDecodeDistance(it->second); distOpt.has_value())
             {
                 distance = distOpt.value();
                 isNextDistance = false;
+                matches.emplace_back(std::byte{0}, distance, length);
+                distance = 0;
+                length = 0;
                 resetCode();
                 continue;
             }
-        }
-
-        // ---- Output match when both decoded ----
-        if (distance != 0 && length != 0)
-        {
-            matches.emplace_back(std::byte{0}, distance, length);
-            distance = 0;
-            length = 0;
         }
     }
 
