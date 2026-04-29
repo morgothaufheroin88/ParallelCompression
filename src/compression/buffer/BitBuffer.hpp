@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#undef assert
+
 namespace deflate
 {
     static inline void assert(const bool condition, const std::string_view &message, const std::source_location &location = std::source_location::current())
