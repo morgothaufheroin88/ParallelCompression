@@ -13,11 +13,11 @@
 #include <iostream>
 #include <queue>
 #include <ranges>
+#include <stdexcept>
 
 void parallel::ParallelDecompression::splitDataIntoBlocks(const std::vector<std::byte> &data)
 {
     std::uint32_t i = 0;
-    compressedBlocks.reserve(data.size());
 
     while ((i + 6) < data.size())
     {
@@ -28,6 +28,11 @@ void parallel::ParallelDecompression::splitDataIntoBlocks(const std::vector<std:
 
         const auto length = static_cast<std::uint16_t>(loBits << 8) | hiBits;
         i += 6;
+
+        if (static_cast<std::size_t>(i) + length > data.size())
+        {
+            throw std::runtime_error(std::format("Corrupt compressed block: offset {} + length {} exceeds data size {}", i, length, data.size()));
+        }
 
         Block block;
         block.insert(block.end(), data.begin() + i, data.begin() + i + length);

@@ -7,6 +7,7 @@
 #include "../encoders/DynamicHuffmanEncoder.hpp"
 #include "../encoders/FixedHuffmanEncoder.hpp"
 #include "../lz/LZ77.hpp"
+#include <exception>
 #include <future>
 
 std::vector<std::byte> deflate::Deflator::createUncompressedBlock(const std::vector<std::byte> &data, const bool isLastBlock) const
@@ -56,27 +57,29 @@ std::vector<std::byte> deflate::Deflator::compress(const std::vector<std::byte> 
     auto encodedWithDynamicCodesDataFuture = std::async(std::launch::async, dynamicEncoding);
 
     auto encodedWithFixedCodesData = encodedWithFixedCodesDataFuture.get();
-    auto encodedWithDynamicCodesData = encodedWithDynamicCodesDataFuture.get();
+    std::vector<std::byte> encodedWithDynamicCodesData;
+    bool hasDynamicEncoding = true;
+    try
+    {
+        encodedWithDynamicCodesData = encodedWithDynamicCodesDataFuture.get();
+    }
+    catch (const std::exception &)
+    {
+        hasDynamicEncoding = false;
+    }
 
-    if ((encodedWithFixedCodesData.size() > (data.size() + 5)) && (encodedWithDynamicCodesData.size() > (data.size() + 5)))
+    if ((encodedWithFixedCodesData.size() > (data.size() + 5)) &&
+        (!hasDynamicEncoding || encodedWithDynamicCodesData.size() > (data.size() + 5)))
     {
         return createUncompressedBlock(data, isLastBlock);
     }
-    else if (encodedWithFixedCodesData.size() < encodedWithDynamicCodesData.size())
+    else if (!hasDynamicEncoding || encodedWithFixedCodesData.size() <= encodedWithDynamicCodesData.size())
     {
         return encodedWithFixedCodesData;
-    }
-    else if (encodedWithFixedCodesData.size() == encodedWithDynamicCodesData.size())
-    {
-        return encodedWithFixedCodesData;
-    }
-    else if (encodedWithFixedCodesData.size() > encodedWithDynamicCodesData.size())
-    {
-        return encodedWithDynamicCodesData;
     }
     else
     {
-        return createUncompressedBlock(data, isLastBlock);
+        return encodedWithDynamicCodesData;
     }
 }
 std::vector<std::byte> deflate::Deflator::operator()(const std::vector<std::byte> &data, const bool isLastBlock, const CompressionLevel compressionLevel) const

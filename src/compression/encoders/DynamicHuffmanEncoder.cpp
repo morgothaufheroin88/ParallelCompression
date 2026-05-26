@@ -145,6 +145,10 @@ std::vector<std::byte> deflate::DynamicHuffmanEncoder::encodeData(const std::vec
 
     literalsCodeLengths = literalsAndLengthsTree.getLengthsFromNodes(LITERALS_AND_LENGTHS_ALPHABET_SIZE + 1);
     distancesCodeLengths = distancesTree.getLengthsFromNodes(FixedHuffmanEncoder::DISTANCES_ALPHABET_SIZE + 1);
+    if (distancesCodeLengths.empty())
+    {
+        distancesCodeLengths.push_back(0);
+    }
 
     //write header
     if (isLastBlock)
