@@ -3,6 +3,7 @@
 //
 
 #include "LZ77.hpp"
+#include <stdexcept>
 
 [[nodiscard]] std::size_t deflate::LZ77::hashSequence(const std::vector<std::byte> &data, const std::uint16_t position)
 {
@@ -142,6 +143,10 @@ void deflate::LZ77::decompress(const std::vector<Match> &compressedData, std::ve
         }
         else
         {
+            if (match.distance == 0 || match.distance > decompressedData.size())
+            {
+                throw std::runtime_error("LZ77: invalid back-reference distance");
+            }
             const auto offset = decompressedData.size() - match.distance;
             for (std::uint16_t i = 0; i < match.length; ++i)
             {

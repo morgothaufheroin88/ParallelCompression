@@ -13,12 +13,9 @@
 void parallel::ParallelCompression::splitDataToBlocks(const std::vector<std::byte> &data)
 {
     const auto MAX_BLOCK_SIZE = static_cast<std::uint64_t>(std::abs(static_cast<std::int32_t>(compressionLevel)) * 1024);
-    std::uint16_t blockIndex = 0;
-    std::uint16_t previousBlockSize = 0;
-    std::uint32_t proceededBytes = 0;
     auto remainingBytes = data.size();
 
-    const auto countOfBlocks = (data.size() / MAX_BLOCK_SIZE) + 1;
+    const auto countOfBlocks = (data.size() + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE;
 
     blocks.resize(countOfBlocks);
     compressedBlocks.reserve(countOfBlocks);
@@ -28,16 +25,17 @@ void parallel::ParallelCompression::splitDataToBlocks(const std::vector<std::byt
         block.reserve(MAX_BLOCK_SIZE);
     }
 
+    std::size_t blockIndex = 0;
+    std::size_t proceededBytes = 0;
     while (remainingBytes > 0)
     {
         const auto blockSize = std::min(MAX_BLOCK_SIZE, remainingBytes);
-
-        proceededBytes += blockSize;
+        const auto blockStart = proceededBytes;
+        proceededBytes += static_cast<std::size_t>(blockSize);
 
         Block block;
-        block.insert(block.end(), data.begin() + (blockIndex * previousBlockSize), data.begin() + proceededBytes);
+        block.insert(block.end(), data.begin() + static_cast<std::ptrdiff_t>(blockStart), data.begin() + static_cast<std::ptrdiff_t>(proceededBytes));
         remainingBytes -= blockSize;
-        previousBlockSize = static_cast<std::uint16_t>(blockSize);
 
         blocks[blockIndex] = block;
         ++blockIndex;
@@ -50,7 +48,7 @@ void parallel::ParallelCompression::createParallelJobs()
     bool isLastBlock = false;
     deflate::Deflator deflator;
     std::queue<CompressionJob> jobs;
-    const auto maxThreads = std::thread::hardware_concurrency();
+    const auto maxThreads = std::max(1u, std::thread::hardware_concurrency());
 
     for (const auto &block: blocks)
     {
@@ -60,7 +58,7 @@ void parallel::ParallelCompression::createParallelJobs()
             compressedBlocks.emplace_back(result, jobs.front().hash, jobs.front().id);
             jobs.pop();
         }
-        isLastBlock = jobIndex == (block.size() - 1);
+        isLastBlock = jobIndex == (blocks.size() - 1);
         const auto uncompressedBlockHash = deflate::crc32(block);
         jobs.emplace(jobIndex, uncompressedBlockHash, std::async(std::launch::async, deflator, block, isLastBlock, compressionLevel));
         ++jobIndex;

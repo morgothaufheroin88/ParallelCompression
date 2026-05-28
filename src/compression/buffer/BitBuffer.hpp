@@ -9,6 +9,8 @@
 #include <string_view>
 #include <vector>
 
+#undef assert
+
 namespace deflate
 {
     static inline void assert(const bool condition, const std::string_view &message, const std::source_location &location = std::source_location::current())
@@ -29,6 +31,8 @@ namespace deflate
         std::byte currentByte{0};
         std::uint8_t bitPosition{0};
         std::size_t byteIndex{0};
+        std::uint64_t bitCache = 0;
+        std::uint32_t bitsAvailable = 0;
 
     public:
         BitBuffer() = default;
@@ -40,5 +44,6 @@ namespace deflate
         [[nodiscard]] std::vector<std::byte> getBytes();
         [[nodiscard]] bool next() const noexcept;
         [[nodiscard]] std::size_t getByteIndex() const noexcept;
+        [[nodiscard]] std::uint32_t peekBits(std::uint32_t numberOfBits);
     };
 }// namespace deflate

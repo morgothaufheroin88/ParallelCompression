@@ -11,6 +11,7 @@
 #include <bitset>
 #include <format>
 #include <iostream>
+#include <stdexcept>
 #include <stack>
 
 std::vector<std::uint32_t> deflate::HuffmanTree::countFrequencies(const std::vector<std::int16_t> &symbols, const std::size_t alphabetSize) const
@@ -107,7 +108,7 @@ std::vector<std::uint8_t> deflate::HuffmanTree::getLengthsFromNodes(const std::u
     if (treeNodes.size() == 1)
     {
         lengths[static_cast<std::uint16_t>(treeNodes[0].symbol)] = 1;
-        while (lengths.back() == 0)
+        while (!lengths.empty() && lengths.back() == 0)
         {
             lengths.pop_back();
         }
@@ -122,7 +123,7 @@ std::vector<std::uint8_t> deflate::HuffmanTree::getLengthsFromNodes(const std::u
         }
     }
 
-    while (lengths.back() == 0)
+    while (!lengths.empty() && lengths.back() == 0)
     {
         lengths.pop_back();
     }
@@ -141,6 +142,19 @@ deflate::HuffmanTree::HuffmanTree(const std::vector<std::int16_t> &symbols, cons
 
 deflate::CodeTable::HuffmanCodeTable deflate::CodeTable::createCodeTable(const std::vector<std::uint8_t> &codeLengths, const std::uint16_t codeTableSize)
 {
+    if (codeLengths.empty())
+    {
+        return {};
+    }
+
+    for (const auto length: codeLengths)
+    {
+        if (length > MAX_BITS)
+        {
+            throw std::runtime_error(std::format("Unsupported Huffman code length {}. Maximum supported length is {}", length, MAX_BITS));
+        }
+    }
+
     if (codeLengths.size() == 1)
     {
         HuffmanCodeTable codeTable;
