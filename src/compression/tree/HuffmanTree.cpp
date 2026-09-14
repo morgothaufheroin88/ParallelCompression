@@ -26,7 +26,7 @@ std::vector<std::uint32_t> deflate::HuffmanTree::countFrequencies(const std::vec
     return frequencies;
 }
 
-void deflate::HuffmanTree::createNodes(const std::vector<std::uint32_t> &frequencies)
+void deflate::HuffmanTree::createNodes(const std::vector<std::uint32_t> &frequencies, MinimalHeap &minimalHeap)
 {
     const auto countOfFrequencies = static_cast<std::uint16_t>(frequencies.size());
     for (std::uint16_t i = 0; i < countOfFrequencies; ++i)
@@ -42,7 +42,7 @@ void deflate::HuffmanTree::createNodes(const std::vector<std::uint32_t> &frequen
     }
 }
 
-void deflate::HuffmanTree::buildTree()
+void deflate::HuffmanTree::buildTree(MinimalHeap &minimalHeap)
 {
     while (minimalHeap.size() > 1)
     {
@@ -83,11 +83,10 @@ void deflate::HuffmanTree::calculateCodesLengths(std::int32_t rootIndex)
         stack.pop();
 
         auto &node = treeNodes[nodesIndex];
-        if ((node.frequency != 0) && (node.leftChildId == -1) && (node.rightChildId == -1))
-        {
-            node.codeLength = currentLength;
-        }
-        else
+        // Every node knows its depth, not only the leaves: flattening the
+        // tree has to count the branches that went too deep as well.
+        node.codeLength = currentLength;
+        if (!((node.frequency != 0) && (node.leftChildId == -1) && (node.rightChildId == -1)))
         {
             if (node.rightChildId != -1)
             {
@@ -131,12 +130,84 @@ std::vector<std::uint8_t> deflate::HuffmanTree::getLengthsFromNodes(const std::u
     return lengths;
 }
 
-deflate::HuffmanTree::HuffmanTree(const std::vector<std::int16_t> &symbols, const std::size_t alphabetSize)
+void deflate::HuffmanTree::limitCodeLengths(const std::uint8_t maxLength)
+{
+    // The leaves, rarest last: those are the ones that end up deepest and
+    // the ones whose codes will be lengthened if anything has to give.
+    std::vector<std::uint32_t> leaves;
+    for (std::uint32_t index = 0; index < treeNodes.size(); ++index)
+    {
+        if (treeNodes[index].symbol > -1)
+        {
+            leaves.push_back(index);
+        }
+    }
+    std::ranges::sort(leaves, [this](const std::uint32_t a, const std::uint32_t b)
+                      {
+                          const auto &left = treeNodes[a];
+                          const auto &right = treeNodes[b];
+                          if (left.codeLength != right.codeLength) return left.codeLength < right.codeLength;
+                          if (left.frequency != right.frequency) return left.frequency > right.frequency;
+                          return left.symbol < right.symbol; });
+
+    if (leaves.empty() || treeNodes[leaves.back()].codeLength <= maxLength)
+    {
+        return;
+    }
+
+    // How many codes of each length there are.  Every code deeper than the
+    // limit is pulled up to it, which makes the code as a whole too big to
+    // be a prefix code -- the Kraft sum goes over one -- and the way back
+    // under is to push some shallower code down a level, which frees a slot
+    // at the limit.  Each push pays for two nodes that went too deep, and
+    // the branches below the limit count as well as the leaves, since each
+    // of them is a slot the flattening did away with: zlib's gen_bitlen,
+    // which counts the same way.
+    std::vector<std::uint32_t> countOfLength(static_cast<std::size_t>(maxLength) + 2, 0);
+    std::int32_t overflow = 0;
+    for (const auto &node: treeNodes)
+    {
+        if (node.codeLength > maxLength)
+        {
+            ++overflow;
+        }
+    }
+    for (const auto index: leaves)
+    {
+        ++countOfLength[std::min(treeNodes[index].codeLength, maxLength)];
+    }
+    while (overflow > 0)
+    {
+        std::uint8_t bits = maxLength - 1;
+        while (countOfLength[bits] == 0)
+        {
+            --bits;
+        }
+        --countOfLength[bits];
+        countOfLength[bits + 1] += 2;
+        --countOfLength[maxLength];
+        overflow -= 2;
+    }
+
+    // Hand the lengths back out, shortest to the commonest.
+    std::size_t leaf = 0;
+    for (std::uint8_t length = 1; length <= maxLength; ++length)
+    {
+        for (std::uint32_t count = 0; count < countOfLength[length]; ++count)
+        {
+            treeNodes[leaves[leaf++]].codeLength = length;
+        }
+    }
+}
+
+deflate::HuffmanTree::HuffmanTree(const std::vector<std::int16_t> &symbols, const std::size_t alphabetSize, const std::uint8_t maxLength)
 {
     const auto frequencies = countFrequencies(symbols, alphabetSize);
-    createNodes(frequencies);
-    buildTree();
+    MinimalHeap minimalHeap{NodeCompare{&treeNodes}};
+    createNodes(frequencies, minimalHeap);
+    buildTree(minimalHeap);
     calculateCodesLengths(static_cast<std::int32_t>(treeNodes.size() - 1));
+    limitCodeLengths(maxLength);
     std::ranges::sort(treeNodes, NodeSortCompare());
 }
 

@@ -30,7 +30,9 @@ void deflate::DynamicHuffmanEncoder::encodeCodeLengths(const std::vector<std::ui
         sq.push_back(static_cast<std::int16_t>(code));
     }
 
-    const HuffmanTree huffmanTree(sq, 19);
+    // Three bits carry each of these lengths, so seven is the most a code
+    // here may have.
+    const HuffmanTree huffmanTree(sq, 19, 7);
     const auto ccl = huffmanTree.getLengthsFromNodes(19);
 
     constexpr std::array<std::uint8_t, 19> permuteOrder = {16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15};
