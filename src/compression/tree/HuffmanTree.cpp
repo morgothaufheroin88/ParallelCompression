@@ -226,16 +226,6 @@ deflate::CodeTable::HuffmanCodeTable deflate::CodeTable::createCodeTable(const s
         }
     }
 
-    if (codeLengths.size() == 1)
-    {
-        HuffmanCodeTable codeTable;
-        CanonicalHuffmanCode code;
-        code.code = 1;
-        code.length = 1;
-        codeTable[0] = code;
-        return codeTable;
-    }
-
     HuffmanCodeTable codeTable(codeTableSize);
     codeTable.reserve(codeLengths.size());
 
