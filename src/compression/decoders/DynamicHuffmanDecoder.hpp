@@ -4,70 +4,39 @@
 
 #pragma once
 #include "../buffer/BitBuffer.hpp"
-#include "../encoders/FixedHuffmanEncoder.hpp"
-#include "../lz/LZ77.hpp"
-#include "../tree/HuffmanTree.hpp"
+#include "HuffmanDecodeTable.hpp"
 
+#include <cstdint>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace deflate
 {
+    /**
+     * @brief Decodes a block that carries its own codes, RFC 1951 3.2.7.
+     *
+     * The header gives the lengths of the literal and distance codes,
+     * themselves written with a third code whose lengths come first; each
+     * is turned into a table and the body is read like a fixed block.
+     */
     class DynamicHuffmanDecoder
     {
     private:
         std::shared_ptr<BitBuffer> bitBuffer{nullptr};
+        HuffmanDecodeTable literals;
+        HuffmanDecodeTable distances;
+
         void decodeHeader();
-        std::vector<std::uint8_t> decodeCCL();
-        void decodeCodeLengths();
-        std::vector<LZ77::Match> decodeBody();
-        [[nodiscard]] inline std::uint32_t reverseBits(std::uint32_t bits, std::uint8_t bitsCount) const;
-        [[nodiscard]] inline std::optional<std::uint16_t> tryDecodeLength(std::uint16_t lengthFixedCode);
-        [[nodiscard]] inline std::optional<std::uint16_t> tryDecodeDistance(std::uint32_t code, std::uint8_t codeBitPosition);
-        [[nodiscard]] inline std::optional<std::uint16_t> tryDecodeDistance(std::uint16_t symbol);
-
-        std::vector<std::uint8_t> literalsCodeLengths;
-        std::vector<std::uint8_t> distanceCodeLengths;
-        std::uint8_t HLIT{0};
-        std::uint8_t HDIST{0};
-        std::uint8_t HCLEN{0};
-        bool isNextDistance = false;
-        CodeTable::ReverseHuffmanCodeTable literalsCodeTable;
-        CodeTable::ReverseHuffmanCodeTable distancesCodeTable;
-
-        static constexpr std::array<std::uint16_t, 29> LENGTH_BASE = {
-                3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
-                35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258};
-
-        static constexpr std::array<std::uint8_t, 29> LENGTH_EXTRA = {
-                0, 0, 0, 0, 0, 0, 0, 0,
-                1, 1, 1, 1,
-                2, 2, 2, 2,
-                3, 3, 3, 3,
-                4, 4, 4, 4,
-                5, 5, 5, 5,
-                0};
-
-        static constexpr std::array<std::uint16_t, 30> DISTANCE_BASE = {
-                1, 2, 3, 4, 5, 7, 9, 13,
-                17, 25, 33, 49, 65, 97,
-                129, 193, 257, 385, 513, 769,
-                1025, 1537, 2049, 3073,
-                4097, 6145, 8193, 12289,
-                16385, 24577};
-
-        static constexpr std::array<std::uint8_t, 30> DISTANCE_EXTRA = {
-                0, 0, 0, 0, 1, 1, 2, 2,
-                3, 3, 4, 4, 5, 5,
-                6, 6, 7, 7, 8, 8,
-                9, 9, 10, 10,
-                11, 11, 12, 12,
-                13, 13};
 
     public:
         explicit DynamicHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitsBuffer);
-        std::vector<LZ77::Match> decodeData();
+        /**
+         * @brief Decode the block onto the end of `output`.
+         *
+         * What `output` already holds is the window: a back-reference in this
+         * block may reach into the blocks decoded before it.
+         */
+        void decodeData(std::vector<std::byte> &output);
         [[nodiscard]] std::size_t getBlockSize() const noexcept;
     };
 }// namespace deflate

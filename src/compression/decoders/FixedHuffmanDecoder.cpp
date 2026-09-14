@@ -3,167 +3,47 @@
 //
 
 #include "FixedHuffmanDecoder.hpp"
+
 #include <array>
-#include <ranges>
 
-std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeLength(const std::uint16_t lengthFixedCode)
+const deflate::HuffmanDecodeTable &deflate::FixedHuffmanDecoder::literalsTable()
 {
-    const auto findByIndex = [&lengthFixedCode](const auto &element)
+    // RFC 1951 3.2.6: 0..143 eight bits, 144..255 nine, 256..279 seven,
+    // 280..287 eight -- the last eight symbols exist in the code and never
+    // in a stream.
+    static const HuffmanDecodeTable table = []
     {
-        return ((element.index + 257) == lengthFixedCode) && (element.code != 0) && (element.codeLength != 0);
-    };
-
-    if (const auto lengthCodesIterator = std::ranges::find_if(FIXED_LENGTHS_CODES, findByIndex); lengthCodesIterator != FIXED_LENGTHS_CODES.end())
-    {
-        std::uint32_t extraBits = 0;
-        if (lengthCodesIterator->extraBitsCount > 0)
+        std::array<std::uint8_t, 288> lengths{};
+        for (std::size_t symbol = 0; symbol < lengths.size(); ++symbol)
         {
-            extraBits = bitBuffer->readBits(lengthCodesIterator->extraBitsCount);
+            lengths[symbol] = symbol < 144 ? 8 : symbol < 256 ? 9 : symbol < 280 ? 7 : 8;
         }
-
-        return lengthCodesIterator->length + extraBits;
-    }
-
-    return std::nullopt;
+        return HuffmanDecodeTable{lengths};
+    }();
+    return table;
 }
 
-std::optional<std::uint16_t> deflate::FixedHuffmanDecoder::tryDecodeDistance(const std::uint16_t code, const std::uint8_t codeBitPosition)
+const deflate::HuffmanDecodeTable &deflate::FixedHuffmanDecoder::distancesTable()
 {
-    const auto it = std::ranges::find_if(distancesCodeTable, [&code, &codeBitPosition](const auto &pair)
-                                         { return (pair.first.code == code) && (pair.first.length == codeBitPosition); });
-
-    std::uint16_t fixedCode = 0;
-    const auto findByIndex = [&fixedCode](const auto &element)
+    // Thirty distance codes of five bits each, plus two the format reserves.
+    static const HuffmanDecodeTable table = []
     {
-        return (element.index == fixedCode) && (element.distance != 0);
-    };
-
-    if (it != distancesCodeTable.end())
-    {
-        fixedCode = it->second;
-        if (const auto distanceCodesIterator = std::ranges::find_if(FIXED_DISTANCES_CODES, findByIndex); distanceCodesIterator != FIXED_DISTANCES_CODES.end())
-        {
-            std::uint32_t extraBits = 0;
-            if (distanceCodesIterator->extraBitsCount > 0)
-            {
-                extraBits = bitBuffer->readBits(distanceCodesIterator->extraBitsCount);
-            }
-
-            return distanceCodesIterator->distance + extraBits;
-        }
-    }
-
-    return std::nullopt;
+        std::array<std::uint8_t, 32> lengths{};
+        lengths.fill(5);
+        return HuffmanDecodeTable{lengths};
+    }();
+    return table;
 }
 
 deflate::FixedHuffmanDecoder::FixedHuffmanDecoder(const std::shared_ptr<BitBuffer> &newBitBuffer) : bitBuffer(newBitBuffer)
 {
-
-    for (const auto &fixedCode: FIXED_LITERALS_CODES)
-    {
-        CodeTable::CanonicalHuffmanCode huffmanCode;
-        huffmanCode.code = fixedCode.code;
-        huffmanCode.length = fixedCode.codeLength;
-        literalsCodeTable[huffmanCode] = std::to_integer<std::uint16_t>(fixedCode.literal);
-    }
-
-    //add end of block code in table
-    CodeTable::CanonicalHuffmanCode endBlockCode;
-    endBlockCode.code = FIXED_LITERALS_CODES[256].code;
-    endBlockCode.length = FIXED_LITERALS_CODES[256].codeLength;
-    literalsCodeTable[endBlockCode] = 256;
-
-    for (const auto &fixedCode: FIXED_LENGTHS_CODES)
-    {
-        CodeTable::CanonicalHuffmanCode huffmanCode;
-        huffmanCode.code = fixedCode.code;
-        huffmanCode.length = fixedCode.codeLength;
-
-        if ((!literalsCodeTable.contains(huffmanCode)) && (huffmanCode.code > 0))
-        {
-
-            literalsCodeTable[huffmanCode] = fixedCode.index + 257;
-        }
-    }
-
-    for (const auto &fixedCode: FIXED_DISTANCES_CODES)
-    {
-        CodeTable::CanonicalHuffmanCode huffmanCode;
-        huffmanCode.code = fixedCode.code;
-        huffmanCode.length = 5;
-        if (!distancesCodeTable.contains(huffmanCode))
-        {
-            distancesCodeTable[huffmanCode] = fixedCode.index;
-        }
-    }
-
 }
 
-std::vector<deflate::LZ77::Match> deflate::FixedHuffmanDecoder::decodeData()
+void deflate::FixedHuffmanDecoder::decodeData(std::vector<std::byte> &output)
 {
-    std::uint16_t distance{0};
-    std::uint16_t length{0};
-    std::uint16_t code{0};
-    std::uint8_t codeBitPosition{0};
-    std::vector<deflate::LZ77::Match> lz77Matches;
-    bool isEndOfBlock{false};
-
-    const auto findCodeInCodeTable = [&code, &codeBitPosition](const auto &pair)
-    { return (pair.first.code == code) && (pair.first.length == codeBitPosition); ; };
-
-    const auto resetCode = [&code, &codeBitPosition]()
-    {
-        code = 0;
-        codeBitPosition = 0;
-    };
-
-    while ((!isEndOfBlock))
-    {
-        //read one bit from byte
-        const auto bit = bitBuffer->readBit();
-        code |= static_cast<std::uint16_t>(std::to_integer<std::uint16_t>(bit) << codeBitPosition);
-        ++codeBitPosition;
-
-        //check if code exists in  code table for literals and distances
-        if (const auto literalsCodeTableIterator = std::ranges::find_if(literalsCodeTable, findCodeInCodeTable); (literalsCodeTableIterator != literalsCodeTable.end()) && (!isNextDistance))
-        {
-            if (literalsCodeTableIterator->second < 256)
-            {
-                lz77Matches.emplace_back(std::byte{static_cast<std::uint8_t>(literalsCodeTableIterator->second)}, 0, 1);
-                resetCode();
-            }
-            else if (literalsCodeTableIterator->second == 256)
-            {
-                isEndOfBlock = true;
-            }
-            else if (auto lengthOptional = tryDecodeLength(literalsCodeTableIterator->second); lengthOptional.has_value())
-            {
-                length = lengthOptional.value();
-                isNextDistance = true;
-                resetCode();
-            }
-        }
-
-        if (isNextDistance)
-        {
-            if (auto distanceOptional = tryDecodeDistance(code, codeBitPosition); distanceOptional.has_value())
-            {
-                distance = distanceOptional.value();
-                isNextDistance = false;
-                resetCode();
-            }
-        }
-
-        if ((distance != 0) && (length != 0))
-        {
-            lz77Matches.emplace_back(std::byte{0}, distance, length);
-            distance = 0;
-            length = 0;
-        }
-    }
-
-    return lz77Matches;
+    decodeBlock(*bitBuffer, literalsTable(), distancesTable(), output);
 }
+
 std::size_t deflate::FixedHuffmanDecoder::getBlockSize() const noexcept
 {
     return bitBuffer->getByteIndex();

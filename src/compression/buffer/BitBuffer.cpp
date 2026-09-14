@@ -104,20 +104,21 @@ std::size_t deflate::BitBuffer::getByteIndex() const noexcept
     return byteIndex;
 }
 
-std::uint32_t deflate::BitBuffer::peekBits(std::uint32_t numberOfBits)
+std::uint32_t deflate::BitBuffer::peekBits(const std::uint32_t numberOfBits)
 {
-    const auto savedByteIndex = byteIndex;
-    const auto savedBitPosition = bitPosition;
-    const auto savedCurrentByte = currentByte;
-    const auto savedBitCache = bitCache;
-    const auto savedBitsAvailable = bitsAvailable;
-    const auto value = readBits(numberOfBits);
+    while (bitsAvailable < numberOfBits && byteIndex < buffer.size())
+    {
+        bitCache |= (static_cast<std::uint64_t>(std::to_integer<std::uint8_t>(buffer[byteIndex])) << bitsAvailable);
+        bitsAvailable += 8;
+        ++byteIndex;
+    }
 
-    bitPosition = savedBitPosition;
-    currentByte = savedCurrentByte;
-    byteIndex = savedByteIndex;
-    bitCache = savedBitCache;
-    bitsAvailable = savedBitsAvailable;
+    return static_cast<std::uint32_t>(bitCache & ((1ull << numberOfBits) - 1));
+}
 
-    return value;
+void deflate::BitBuffer::consumeBits(const std::uint32_t numberOfBits)
+{
+    assert(bitsAvailable >= numberOfBits, "Attempt to read past the end of bit buffer");
+    bitCache >>= numberOfBits;
+    bitsAvailable -= numberOfBits;
 }

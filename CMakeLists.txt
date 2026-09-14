@@ -18,6 +18,8 @@ set(SOURCE_FILES
         src/compression/buffer/BitBuffer.hpp
         src/compression/encoders/FixedHuffmanEncoder.cpp
         src/compression/encoders/FixedHuffmanEncoder.hpp
+        src/compression/decoders/HuffmanDecodeTable.cpp
+        src/compression/decoders/HuffmanDecodeTable.hpp
         src/compression/decoders/FixedHuffmanDecoder.cpp
         src/compression/decoders/FixedHuffmanDecoder.hpp
         src/compression/tree/HuffmanTree.cpp

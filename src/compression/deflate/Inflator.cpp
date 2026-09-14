@@ -34,17 +34,19 @@ std::vector<std::byte> deflate::Inflator::decompress(const std::vector<std::byte
     }
     else if (blockType == 1)
     {
+        std::vector<std::byte> result;
         FixedHuffmanDecoder decoder(bitBuffer);
-        const auto buffer = decoder.decodeData();
+        decoder.decodeData(result);
         blockSize = decoder.getBlockSize();
-        return LZ77::decompress(buffer);
+        return result;
     }
     else if (blockType == 2)
     {
+        std::vector<std::byte> result;
         DynamicHuffmanDecoder decoder(bitBuffer);
-        const auto buffer = decoder.decodeData();
+        decoder.decodeData(result);
         blockSize = decoder.getBlockSize();
-        return LZ77::decompress(buffer);
+        return result;
     }
     else
     {

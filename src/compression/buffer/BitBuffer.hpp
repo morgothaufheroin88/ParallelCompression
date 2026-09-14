@@ -44,6 +44,18 @@ namespace deflate
         [[nodiscard]] std::vector<std::byte> getBytes();
         [[nodiscard]] bool next() const noexcept;
         [[nodiscard]] std::size_t getByteIndex() const noexcept;
+
+        /**
+         * @brief The next bits, without taking them.
+         *
+         * Past the end of the input the missing bits read as zero rather
+         * than failing: a decoder looks ahead by the longest code it knows,
+         * and the last code in a stream is usually shorter than that.
+         * What it then consumes is checked by consumeBits.
+         */
         [[nodiscard]] std::uint32_t peekBits(std::uint32_t numberOfBits);
+
+        /** @brief Take bits that peekBits already showed. */
+        void consumeBits(std::uint32_t numberOfBits);
     };
 }// namespace deflate
