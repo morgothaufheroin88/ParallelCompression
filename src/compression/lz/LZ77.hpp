@@ -3,8 +3,8 @@
 //
 
 #pragma once
+#include <cstddef>
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 namespace deflate
@@ -19,16 +19,25 @@ namespace deflate
             std::uint16_t length;
         };
 
-    private:
-        using HashTable = std::unordered_map<std::size_t, std::uint16_t>;
-        [[nodiscard]] static std::size_t hashSequence(const std::vector<std::byte> &data, std::uint16_t position);
-        constexpr static std::uint16_t MAX_MATCH_LENGTH = 258;
-        static constexpr std::uint16_t WINDOW_SIZE = 32 * 1024;
-        [[nodiscard]] static Match findBestMatch(const std::vector<std::byte> &data, std::uint16_t position, HashTable &hashTable);
-        [[nodiscard]] static Match findBestMatch(const std::vector<std::byte> &data, std::uint16_t position);
+        static constexpr std::uint16_t MIN_MATCH_LENGTH = 3;
+        static constexpr std::uint16_t MAX_MATCH_LENGTH = 258;
+        static constexpr std::uint32_t WINDOW_SIZE = 32 * 1024;
 
-    public:
-        static std::vector<Match> compress(const std::vector<std::byte> &dataToCompress, bool isUseHashMap);
+        /**
+         * @brief Find the literals and back-references that make up the data.
+         *
+         * Every position is hashed on its first three bytes into a chain of
+         * the earlier positions that hashed the same, and the longest match
+         * along the chain wins.  A match is not taken at once: if the next
+         * position holds a longer one, the byte is sent as a literal and the
+         * longer match taken instead -- zlib's lazy evaluation, which is
+         * most of what separates a fair ratio from a good one.
+         *
+         * @param thorough How far down each chain to look: a longer search
+         *        finds longer matches and takes longer to do it.  The two
+         *        settings the compression levels distinguish.
+         */
+        static std::vector<Match> compress(const std::vector<std::byte> &dataToCompress, bool thorough);
         static std::vector<std::byte> decompress(const std::vector<Match> &compressedData);
         static void decompress(const std::vector<Match> &compressedData, std::vector<std::byte> &decompressedData);
     };
